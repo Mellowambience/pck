@@ -1,0 +1,5 @@
+{
+  "name": "Crystal Web Engine",
+  "description": "A custom 2D tile-based RPG engine inspired by Pokémon Crystal, featuring grid-based movement and a retro GameBoy Color UI.",
+  "requestFramePermissions": []
+}
