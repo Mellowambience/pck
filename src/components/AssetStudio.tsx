@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Image as ImageIcon, Loader2, Trash2, Sparkles } from 'lucide-react';
-import { SPRITE_KEYS, generateSprite, saveSprite, loadSprite, clearSprites } from '../services/SpriteGenerator';
+import { X, Image as ImageIcon, Loader2, Trash2, Sparkles, Settings2 } from 'lucide-react';
+import { SPRITE_KEYS, generateSprite, saveSprite, loadSprite, clearSprites, ImageSize } from '../services/SpriteGenerator';
 
 interface AssetStudioProps {
   onClose: () => void;
@@ -13,6 +13,9 @@ export function AssetStudio({ onClose, apiKey, onSpritesUpdated }: AssetStudioPr
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, currentKey: '' });
   const [error, setError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash-image');
+  const [selectedSize, setSelectedSize] = useState<ImageSize>('1K');
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     loadAllSprites();
@@ -42,7 +45,7 @@ export function AssetStudio({ onClose, apiKey, onSpritesUpdated }: AssetStudioPr
         const key = SPRITE_KEYS[i];
         setProgress({ current: i + 1, total: SPRITE_KEYS.length, currentKey: key });
         
-        const dataUrl = await generateSprite(key, keyToUse);
+        const dataUrl = await generateSprite(key, keyToUse, selectedModel, selectedSize);
         saveSprite(key, dataUrl);
         
         setSprites(prev => ({ ...prev, [key]: dataUrl }));
@@ -76,7 +79,7 @@ export function AssetStudio({ onClose, apiKey, onSpritesUpdated }: AssetStudioPr
         const key = missingKeys[i];
         setProgress({ current: i + 1, total: missingKeys.length, currentKey: key });
         
-        const dataUrl = await generateSprite(key, keyToUse);
+        const dataUrl = await generateSprite(key, keyToUse, selectedModel, selectedSize);
         saveSprite(key, dataUrl);
         
         // Update state incrementally
@@ -104,7 +107,7 @@ export function AssetStudio({ onClose, apiKey, onSpritesUpdated }: AssetStudioPr
     setProgress({ current: 1, total: 1, currentKey: key });
 
     try {
-      const dataUrl = await generateSprite(key, keyToUse);
+      const dataUrl = await generateSprite(key, keyToUse, selectedModel, selectedSize);
       saveSprite(key, dataUrl);
       setSprites(prev => ({ ...prev, [key]: dataUrl }));
       onSpritesUpdated();
@@ -139,10 +142,55 @@ export function AssetStudio({ onClose, apiKey, onSpritesUpdated }: AssetStudioPr
               <p className="text-xs text-neutral-400">AI-Generated Game Textures</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-neutral-400 hover:text-white p-2">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-2 rounded-lg transition-colors ${showSettings ? 'bg-white/10 text-white' : 'text-neutral-400 hover:text-white'}`}
+              title="Generation Settings"
+            >
+              <Settings2 className="w-5 h-5" />
+            </button>
+            <button onClick={onClose} className="text-neutral-400 hover:text-white p-2">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
+
+        {showSettings && (
+          <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-xl space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2">Model</label>
+                <select 
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="gemini-2.5-flash-image">Gemini 2.5 Flash (Fast)</option>
+                  <option value="gemini-3.1-flash-image-preview">Gemini 3.1 Flash (New)</option>
+                  <option value="gemini-3.1-pro-image-preview">Gemini 3.1 Pro (High Quality)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2">Size</label>
+                <select 
+                  value={selectedSize}
+                  onChange={(e) => setSelectedSize(e.target.value as ImageSize)}
+                  disabled={!selectedModel.includes('pro') && !selectedModel.includes('3.1')}
+                  className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                >
+                  <option value="512px">512px</option>
+                  <option value="1K">1K (Standard)</option>
+                  <option value="2K">2K (High Res)</option>
+                  <option value="4K">4K (Ultra Res)</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-[10px] text-neutral-500 italic">
+              * Size selection is only available for Gemini 3.1 models.
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
@@ -218,7 +266,7 @@ export function AssetStudio({ onClose, apiKey, onSpritesUpdated }: AssetStudioPr
           </div>
           
           <p className="text-xs text-neutral-500 max-w-xs text-center sm:text-right">
-            Uses Gemini 2.5 Flash to generate 32x32 pixel art textures. This may take a minute.
+            Uses {selectedModel.includes('pro') ? 'Gemini Pro' : 'Gemini Flash'} to generate textures.
           </p>
         </div>
 

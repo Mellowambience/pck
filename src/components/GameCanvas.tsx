@@ -4,6 +4,8 @@ import { GameEngine } from '../game/Engine';
 interface Props {
   onInteract: (x: number, y: number, tileType: number) => void;
   onEntityInteract: (entity: any) => void;
+  onRoseCollected?: (count: number) => void;
+  onLeylineHealed?: (count: number) => void;
 }
 
 export interface GameCanvasRef {
@@ -11,13 +13,18 @@ export interface GameCanvasRef {
   getMapWindow: (x: number, y: number, radius: number) => {x: number, y: number, type: number}[];
   getPlayerPosition: () => { x: number, y: number };
   reloadSprites: () => void;
+  spawnEntity: (x: number, y: number, type: 'rose' | 'sheep' | 'shrine' | 'crystal' | 'fire' | 'sign' | 'leyline' | 'demon', name?: string, isCorrupted?: boolean) => void;
+  getMinimapData: (radius: number) => number[];
+  getTimeOfDay: () => number;
 }
 
-export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEntityInteract }, ref) => {
+export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEntityInteract, onRoseCollected, onLeylineHealed }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const onInteractRef = useRef(onInteract);
   const onEntityInteractRef = useRef(onEntityInteract);
+  const onRoseCollectedRef = useRef(onRoseCollected);
+  const onLeylineHealedRef = useRef(onLeylineHealed);
 
   useEffect(() => {
     onInteractRef.current = onInteract;
@@ -26,6 +33,14 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
   useEffect(() => {
     onEntityInteractRef.current = onEntityInteract;
   }, [onEntityInteract]);
+
+  useEffect(() => {
+    onRoseCollectedRef.current = onRoseCollected;
+  }, [onRoseCollected]);
+
+  useEffect(() => {
+    onLeylineHealedRef.current = onLeylineHealed;
+  }, [onLeylineHealed]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -45,6 +60,8 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
       (x, y, t) => onInteractRef.current(x, y, t),
       (entity) => onEntityInteractRef.current(entity)
     );
+    engine.onRoseCollected = (count) => onRoseCollectedRef.current?.(count);
+    engine.onLeylineHealed = (count) => onLeylineHealedRef.current?.(count);
     engine.start();
     engineRef.current = engine;
 
@@ -110,6 +127,23 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
       if (engineRef.current) {
         engineRef.current.loadSprites();
       }
+    },
+    spawnEntity: (x, y, type, name, isCorrupted) => {
+      if (engineRef.current) {
+        engineRef.current.spawnEntity(x, y, type, name, isCorrupted);
+      }
+    },
+    getMinimapData: (radius) => {
+      if (engineRef.current) {
+        return engineRef.current.getMinimapData(radius);
+      }
+      return [];
+    },
+    getTimeOfDay: () => {
+      if (engineRef.current) {
+        return engineRef.current.getTimeOfDay();
+      }
+      return 0;
     }
   }));
 

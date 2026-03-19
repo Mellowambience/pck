@@ -2,13 +2,22 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GameCanvas, GameCanvasRef } from './components/GameCanvas';
 import { generateDMResponse, generateProceduralResponse, generateNPCResponse } from './services/DungeonMaster';
 import { tileNames } from './game/MapData';
-import { Sparkles, Zap, MessageSquare, X, Send, Key, Image as ImageIcon } from 'lucide-react';
+import { Sparkles, Zap, MessageSquare, X, Send, Key, Image as ImageIcon, Map as MapIcon } from 'lucide-react';
 import { AssetStudio } from './components/AssetStudio';
+import { Minimap } from './components/Minimap';
+import { Clock } from './components/Clock';
+import { auth, db } from './firebase';
+import { signInAnonymously, onAuthStateChanged, User, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 
 export default function App() {
   const [isThinking, setIsThinking] = useState(false);
   const [resonance, setResonance] = useState(0);
   
+  // Auth & Persistence State
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
   // Chat State
   const [activeNPC, setActiveNPC] = useState<any>(null);
   const [chatHistory, setChatHistory] = useState<{role: string, text: string}[]>([]);
@@ -16,10 +25,98 @@ export default function App() {
   const [isChatting, setIsChatting] = useState(false);
   const [showApiConfig, setShowApiConfig] = useState(false);
   const [showAssetStudio, setShowAssetStudio] = useState(false);
+  const [roseCount, setRoseCount] = useState(0);
+  const [leylinesHealed, setLeylinesHealed] = useState(0);
+  const [demonsTamed, setDemonsTamed] = useState(0);
   const [apiKey, setApiKey] = useState(process.env.GEMINI_API_KEY || "");
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  
+  // Engine State
+  const [minimapData, setMinimapData] = useState<number[]>([]);
+  const [currentTime, setCurrentTime] = useState(0);
 
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<GameCanvasRef>(null);
+
+  // Auth Setup
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      if (u) {
+        setUser(u);
+        loadGameState(u.uid);
+      } else {
+        // Attempt anonymous sign-in, but catch errors if provider is disabled
+        signInAnonymously(auth).catch(err => {
+          if (err.code === 'auth/admin-restricted-operation') {
+            console.warn("Anonymous auth is disabled in Firebase Console. Please enable it or use Google Login.");
+          } else {
+            console.error("Auth error:", err);
+          }
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
+  };
+
+  // Polling for Minimap and Time
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (gameRef.current) {
+        setMinimapData(gameRef.current.getMinimapData(5));
+        setCurrentTime(gameRef.current.getTimeOfDay());
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadGameState = async (uid: string) => {
+    try {
+      const docRef = doc(db, 'game_states', uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setResonance(data.resonance || 0);
+        setRoseCount(data.roseCount || 0);
+        setLeylinesHealed(data.leylinesHealed || 0);
+        setDemonsTamed(data.demonsTamed || 0);
+      }
+      setIsLoaded(true);
+    } catch (error) {
+      console.error("Error loading game state:", error);
+      setIsLoaded(true);
+    }
+  };
+
+  const saveGameState = async () => {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, 'game_states', user.uid), {
+        resonance,
+        roseCount,
+        leylinesHealed,
+        demonsTamed,
+        lastUpdated: new Date().toISOString()
+      }, { merge: true });
+    } catch (error) {
+      console.error("Error saving game state:", error);
+    }
+  };
+
+  // Auto-save on state changes
+  useEffect(() => {
+    if (isLoaded) {
+      const timer = setTimeout(saveGameState, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [resonance, roseCount, leylinesHealed, demonsTamed, isLoaded]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -37,9 +134,52 @@ export default function App() {
   };
 
   const handleEntityInteract = (entity: any) => {
+    if (entity.type === 'rose') return; // Roses are collected on move
+    
     setActiveNPC(entity);
     if (entity.type === 'sheep') {
       setChatHistory([{ role: 'npc', text: 'Baa.' }]);
+    } else if (entity.type === 'shrine') {
+      setChatHistory([{ role: 'npc', text: 'The ancient stone circle hums with aetheric energy. You feel a deep connection to the world.' }]);
+      setResonance(prev => Math.min(100, prev + 50));
+    } else if (entity.type === 'crystal') {
+      setChatHistory([{ role: 'npc', text: 'The violet crystal pulses with light. It seems to be a source of pure aether.' }]);
+      setResonance(prev => Math.min(100, prev + 20));
+    } else if (entity.type === 'fire') {
+      setChatHistory([{ role: 'npc', text: 'The Mars-flame warms your spirit. It never seems to go out.' }]);
+    } else if (entity.type === 'sign') {
+      setChatHistory([{ role: 'npc', text: 'The sign reads: "Welcome to Aetherhaven. Seek the roses, find the truth."' }]);
+    } else if (entity.type === 'leyline') {
+      if (entity.isCorrupted) {
+        if (roseCount >= 3) {
+          setChatHistory([{ role: 'npc', text: 'You use 3 Mystical Roses to heal the leyline. Aether flows freely once more!' }]);
+          setRoseCount(prev => prev - 3);
+          setLeylinesHealed(prev => prev + 1);
+          entity.isCorrupted = false;
+          entity.name = "Healed Leyline";
+          setResonance(prev => Math.min(100, prev + 40));
+        } else {
+          setChatHistory([{ role: 'npc', text: 'This leyline is dormant and corrupted by Mars-flame. You need 3 Mystical Roses to heal it.' }]);
+        }
+      } else {
+        setChatHistory([{ role: 'npc', text: 'The leyline is vibrant and healthy. It pulses with the heartbeat of Aetherhaven.' }]);
+      }
+    } else if (entity.type === 'demon') {
+      if (entity.isCorrupted) {
+        if (roseCount >= 5) {
+          setChatHistory([{ role: 'npc', text: 'You offer 5 Mystical Roses to the corrupted spirit. Its shadows fade, revealing a gentle Aether-Kin!' }]);
+          setRoseCount(prev => prev - 5);
+          setDemonsTamed(prev => prev + 1);
+          entity.isCorrupted = false;
+          entity.type = 'sheep';
+          entity.name = "Tamed Spirit";
+          setResonance(prev => Math.min(100, prev + 60));
+        } else {
+          setChatHistory([{ role: 'npc', text: 'A spirit corrupted by Mars-shadows. It growls at you. Perhaps 5 Mystical Roses could soothe its pain?' }]);
+        }
+      } else {
+        setChatHistory([{ role: 'npc', text: 'A gentle spirit you have tamed. It seems happy.' }]);
+      }
     } else {
       setChatHistory([{ role: 'npc', text: 'Greetings, traveler. What brings you to these parts?' }]);
     }
@@ -73,8 +213,8 @@ export default function App() {
       if (response.mapUpdates && response.mapUpdates.length > 0) {
         gameRef.current?.updateMap(response.mapUpdates);
       }
-      // Increase resonance. Every 4-5 clicks triggers an Atlas Event.
-      setResonance(prev => Math.min(100, prev + 25)); 
+      // Increase resonance. Every 10 clicks triggers an Atlas Event.
+      setResonance(prev => Math.min(100, prev + 10)); 
     } else {
       // Atlas Event (Gemini API Call)
       setIsThinking(true);
@@ -85,9 +225,42 @@ export default function App() {
         if (response.mapUpdates && response.mapUpdates.length > 0) {
           gameRef.current?.updateMap(response.mapUpdates);
         }
+
+        if (response.entityUpdates && response.entityUpdates.length > 0) {
+          response.entityUpdates.forEach(ent => {
+            gameRef.current?.spawnEntity(ent.x, ent.y, ent.type as any, ent.name, ent.isCorrupted);
+          });
+        }
+
+        if (response.resonanceChange) {
+          setResonance(prev => Math.max(0, Math.min(100, prev + response.resonanceChange!)));
+        }
+
+        if (response.narrativeResponse) {
+          setChatHistory(prev => [...prev, { role: 'dm', text: response.narrativeResponse! }]);
+        }
+
         setResonance(0); // Reset after a major shift
-      } catch (e) {
+      } catch (e: any) {
         console.error("Atlas connection lost", e);
+        
+        // Check for Quota Error (429)
+        const isQuotaError = e.message?.includes('429') || e.status === 'RESOURCE_EXHAUSTED';
+        
+        // FALLBACK: If API fails, do a procedural update
+        const fallback = generateProceduralResponse(x, y, tileType, playerPos);
+        if (fallback.mapUpdates) {
+          gameRef.current?.updateMap(fallback.mapUpdates);
+        }
+        
+        // Set resonance back to 90 so it doesn't immediately retry but stays close
+        setResonance(90); 
+        
+        const errorMsg = isQuotaError 
+          ? "The Atlas is resting. The world shifts by instinct alone." 
+          : "The Atlas is momentarily silent. The world shifts by instinct alone.";
+          
+        setChatHistory(prev => [...prev, { role: 'dm', text: errorMsg }]);
       }
       setIsThinking(false);
     }
@@ -96,7 +269,21 @@ export default function App() {
   return (
     <div className="h-screen w-full bg-neutral-950 relative font-sans text-neutral-200 overflow-hidden">
       {/* Game Area */}
-      <GameCanvas ref={gameRef} onInteract={handleInteract} onEntityInteract={handleEntityInteract} />
+      <GameCanvas 
+        ref={gameRef} 
+        onInteract={handleInteract} 
+        onEntityInteract={handleEntityInteract} 
+        onRoseCollected={(count) => setRoseCount(count)}
+        onLeylineHealed={(count) => setLeylinesHealed(count)}
+      />
+
+      {/* Minimap & Clock */}
+      <div className="absolute bottom-6 left-6 z-40 flex flex-col gap-4 pointer-events-none">
+        <Clock time={currentTime} />
+        <div className="pointer-events-auto">
+          <Minimap data={minimapData} radius={5} />
+        </div>
+      </div>
       
       {/* Settings Button */}
       <div className="absolute top-6 left-6 flex flex-col gap-3 z-50">
@@ -114,6 +301,19 @@ export default function App() {
         >
           <ImageIcon className="w-5 h-5" />
         </button>
+        {!user || user.isAnonymous ? (
+          <button 
+            onClick={handleGoogleLogin}
+            className="p-2 bg-indigo-600/40 backdrop-blur-md border border-indigo-500/30 rounded-full text-indigo-300 hover:text-white hover:bg-indigo-500/40 transition-colors"
+            title="Connect Google Account"
+          >
+            <Sparkles className="w-5 h-5" />
+          </button>
+        ) : (
+          <div className="w-9 h-9 rounded-full border border-emerald-500/50 overflow-hidden shadow-lg shadow-emerald-500/20" title={`Logged in as ${user.displayName}`}>
+            <img src={user.photoURL || ""} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          </div>
+        )}
       </div>
 
       {/* API Config Modal */}
@@ -167,9 +367,48 @@ export default function App() {
         />
       )}
 
+      {/* Mission Log */}
+      <div className="absolute top-6 right-6 flex flex-col gap-2 z-40 pointer-events-none">
+        <div className="bg-black/40 backdrop-blur-md border border-white/10 p-4 rounded-2xl w-64 shadow-xl pointer-events-auto">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-4 h-4 text-indigo-400" />
+            <h3 className="text-xs font-bold uppercase tracking-widest text-indigo-300">Mission: Save Earth</h3>
+          </div>
+          <div className="space-y-3">
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between text-[10px] text-neutral-400 uppercase">
+                <span>Heal Leylines</span>
+                <span>{leylinesHealed}/3</span>
+              </div>
+              <div className="h-1 bg-neutral-800 rounded-full overflow-hidden">
+                <div className="h-full bg-sky-500 transition-all" style={{ width: `${(leylinesHealed / 3) * 100}%` }} />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between text-[10px] text-neutral-400 uppercase">
+                <span>Tame Spirits</span>
+                <span>{demonsTamed}/2</span>
+              </div>
+              <div className="h-1 bg-neutral-800 rounded-full overflow-hidden">
+                <div className="h-full bg-orange-500 transition-all" style={{ width: `${(demonsTamed / 2) * 100}%` }} />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between text-[10px] text-neutral-400 uppercase">
+                <span>Preserve Land</span>
+                <span>{roseCount}/10</span>
+              </div>
+              <div className="h-1 bg-neutral-800 rounded-full overflow-hidden">
+                <div className="h-full bg-rose-500 transition-all" style={{ width: `${Math.min(100, (roseCount / 10) * 100)}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Subtle Loading Indicator */}
       {isThinking && (
-        <div className="absolute top-6 right-6 bg-black/40 backdrop-blur-md border border-indigo-500/20 px-4 py-2 rounded-full flex items-center gap-3 z-50 shadow-lg">
+        <div className="absolute top-40 right-6 bg-black/40 backdrop-blur-md border border-indigo-500/20 px-4 py-2 rounded-full flex items-center gap-3 z-50 shadow-lg">
           <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
           <span className="text-xs font-medium tracking-widest uppercase text-indigo-300/80">Reality Shifting...</span>
         </div>
@@ -177,11 +416,19 @@ export default function App() {
 
       {/* Resonance Meter */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-40 pointer-events-none">
-        <div className="flex items-center gap-2">
-          <Zap className={`w-4 h-4 ${resonance >= 100 ? 'text-indigo-400 animate-pulse' : 'text-neutral-600'}`} />
-          <span className={`text-[10px] font-bold uppercase tracking-[0.2em] ${resonance >= 100 ? 'text-indigo-300' : 'text-neutral-500'}`}>
-            {resonance >= 100 ? 'Atlas Alignment Critical' : 'World Resonance'}
-          </span>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Zap className={`w-4 h-4 ${resonance >= 100 ? 'text-indigo-400 animate-pulse' : 'text-neutral-600'}`} />
+            <span className={`text-[10px] font-bold uppercase tracking-[0.2em] ${resonance >= 100 ? 'text-indigo-300' : 'text-neutral-500'}`}>
+              {resonance >= 100 ? 'Atlas Alignment Critical' : 'World Resonance'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-rose-400" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-300">
+              {roseCount} Roses
+            </span>
+          </div>
         </div>
         <div className="w-64 h-1.5 bg-neutral-900 rounded-full overflow-hidden border border-white/5 shadow-inner">
           <div 

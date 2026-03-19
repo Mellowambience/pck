@@ -7,9 +7,10 @@ export interface Entity {
   gridY: number;
   pixelX: number;
   pixelY: number;
-  type: 'sheep' | 'traveler';
+  type: 'sheep' | 'traveler' | 'rose' | 'shrine' | 'crystal' | 'fire' | 'sign' | 'leyline' | 'demon';
   name: string;
   isMoving: boolean;
+  isCorrupted?: boolean;
 }
 
 export class GameEngine {
@@ -18,7 +19,7 @@ export class GameEngine {
   animationFrameId: number = 0;
   lastTime: number = 0;
   globalTime: number = 0;
-
+  dayTime: number = 0; // 0 to 1, representing day cycle
   onInteract: (x: number, y: number, tileType: number) => void;
 
   player = {
@@ -34,6 +35,10 @@ export class GameEngine {
 
   hoverX: number = -1;
   hoverY: number = -1;
+  rosesCollected: number = 0;
+  leylinesHealed: number = 0;
+  onRoseCollected?: (count: number) => void;
+  onLeylineHealed?: (count: number) => void;
 
   chunks: Map<string, number[][]> = new Map();
   entities: Entity[] = [];
@@ -86,16 +91,48 @@ export class GameEngine {
         const solidTiles = [1, 2, 4, 5, 7, 8];
         
         if (!solidTiles.includes(localTile)) {
-          const isTraveler = Math.random() > 0.6;
-          const travelerNames = ["Elara", "Thorne", "Lyra", "Kael", "Sylas", "Aria", "Rowan", "Finn", "Maeve", "Caleb"];
-          const name = isTraveler ? travelerNames[Math.floor(Math.random() * travelerNames.length)] : 'Sheep';
+          const rand = Math.random();
+          let type: Entity['type'] = 'sheep';
+          let name = 'Sheep';
+          let isCorrupted = false;
+          
+          if (rand > 0.98) {
+            type = 'demon';
+            name = 'Corrupted Spirit';
+            isCorrupted = true;
+          } else if (rand > 0.96) {
+            type = 'leyline';
+            name = 'Dormant Leyline';
+            isCorrupted = true;
+          } else if (rand > 0.93) {
+            type = 'shrine';
+            name = 'Ancient Shrine';
+          } else if (rand > 0.9) {
+            type = 'crystal';
+            name = 'Aether Crystal';
+          } else if (rand > 0.85) {
+            type = 'fire';
+            name = 'Mars Flame';
+          } else if (rand > 0.8) {
+            type = 'sign';
+            name = 'Ancient Signpost';
+          } else if (rand > 0.7) {
+            type = 'rose';
+            name = 'Mystical Rose';
+          } else if (rand > 0.4) {
+            type = 'traveler';
+            const travelerNames = ["Elara", "Thorne", "Lyra", "Kael", "Sylas", "Aria", "Rowan", "Finn", "Maeve", "Caleb"];
+            name = travelerNames[Math.floor(Math.random() * travelerNames.length)];
+          }
+
           this.entities.push({
             id: Math.random().toString(36).substring(2, 9),
             gridX: ex, gridY: ey,
             pixelX: ex * TILE_SIZE, pixelY: ey * TILE_SIZE,
-            type: isTraveler ? 'traveler' : 'sheep',
+            type: type,
             name: name,
-            isMoving: false
+            isMoving: false,
+            isCorrupted: isCorrupted
           });
         }
       }
@@ -182,6 +219,7 @@ export class GameEngine {
 
     this.lastTime = time;
     this.globalTime += deltaTime;
+    this.dayTime = (Math.sin(this.globalTime * 0.1) + 1) / 2; // Slow cycle
 
     this.update(deltaTime);
     this.draw();
@@ -192,7 +230,11 @@ export class GameEngine {
   private isSolid(x: number, y: number) {
     const tile = this.getTile(x, y);
     const isTileSolid = tile === 1 || tile === 2 || tile === 4 || tile === 5 || tile === 7 || tile === 8;
-    const isEntitySolid = this.entities.some(e => e.gridX === x && e.gridY === y);
+    const isEntitySolid = this.entities.some(e => {
+      if (e.gridX !== x || e.gridY !== y) return false;
+      // Roses, fire, and leylines are not solid, everything else is
+      return !['rose', 'fire', 'leyline'].includes(e.type);
+    });
     return isTileSolid || isEntitySolid;
   }
 
@@ -324,6 +366,14 @@ export class GameEngine {
 
       if (this.player.pixelX === targetPixelX && this.player.pixelY === targetPixelY) {
         this.player.isMoving = false;
+        
+        // Check for rose collection
+        const roseIndex = this.entities.findIndex(e => e.type === 'rose' && e.gridX === this.player.gridX && e.gridY === this.player.gridY);
+        if (roseIndex !== -1) {
+          this.entities.splice(roseIndex, 1);
+          this.rosesCollected++;
+          if (this.onRoseCollected) this.onRoseCollected(this.rosesCollected);
+        }
       }
     }
 
@@ -512,7 +562,7 @@ export class GameEngine {
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(px + 10, py + 26, 2, 4);
             ctx.fillRect(px + 20, py + 26, 2, 4);
-          } else {
+          } else if (ent.type === 'traveler') {
             // Cloak
             ctx.fillStyle = '#9f1239'; // red cloak
             ctx.beginPath(); ctx.moveTo(px + 16, py + 8); ctx.lineTo(px + 24, py + 28); ctx.lineTo(px + 8, py + 28); ctx.fill();
@@ -522,6 +572,36 @@ export class GameEngine {
             // Hood
             ctx.fillStyle = '#881337';
             ctx.beginPath(); ctx.arc(px + 16, py + 8, 7, Math.PI, 0); ctx.fill();
+          } else if (ent.type === 'rose') {
+            ctx.fillStyle = '#e11d48';
+            ctx.beginPath(); ctx.arc(px + 16, py + 16, 4, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#16a34a';
+            ctx.fillRect(px + 15, py + 20, 2, 8);
+          } else if (ent.type === 'shrine') {
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(px + 4, py + 4, 24, 24);
+            ctx.fillStyle = '#818cf8';
+            ctx.beginPath(); ctx.arc(px + 16, py + 16, 6, 0, Math.PI*2); ctx.fill();
+          } else if (ent.type === 'crystal') {
+            ctx.fillStyle = '#a855f7';
+            ctx.beginPath(); ctx.moveTo(px + 16, py + 4); ctx.lineTo(px + 24, py + 24); ctx.lineTo(px + 8, py + 24); ctx.fill();
+          } else if (ent.type === 'fire') {
+            ctx.fillStyle = '#f97316';
+            ctx.beginPath(); ctx.moveTo(px + 16, py + 8); ctx.lineTo(px + 24, py + 28); ctx.lineTo(px + 8, py + 28); ctx.fill();
+          } else if (ent.type === 'sign') {
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(px + 14, py + 16, 4, 14);
+            ctx.fillRect(px + 6, py + 8, 20, 10);
+          } else if (ent.type === 'leyline') {
+            const alpha = (Math.sin(this.globalTime * 2) + 1) / 2;
+            ctx.fillStyle = ent.isCorrupted ? `rgba(249, 115, 22, ${alpha * 0.5})` : `rgba(56, 189, 248, ${alpha * 0.8})`;
+            ctx.beginPath(); ctx.arc(px + 16, py + 16, 12, 0, Math.PI * 2); ctx.fill();
+          } else if (ent.type === 'demon') {
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath(); ctx.arc(px + 16, py + 16, 10, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#f97316';
+            ctx.fillRect(px + 12, py + 12, 2, 2);
+            ctx.fillRect(px + 18, py + 12, 2, 2);
           }
         }
       }
@@ -645,5 +725,25 @@ export class GameEngine {
     gradient.addColorStop(1, 'rgba(0,0,0,0.7)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  public getMinimapData(radius: number) {
+    const data = [];
+    const px = this.player.gridX;
+    const py = this.player.gridY;
+    
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const nx = px + dx;
+        const ny = py + dy;
+        data.push(this.getTile(nx, ny));
+      }
+    }
+    return data;
+  }
+
+  public getTimeOfDay() {
+    const cycleLength = 60;
+    return (this.globalTime % cycleLength) / cycleLength;
   }
 }

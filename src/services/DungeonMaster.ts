@@ -5,6 +5,9 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 export interface DMResponse {
   mapUpdates?: { x: number, y: number, tileType: number }[];
+  entityUpdates?: { x: number, y: number, type: string, name?: string, isCorrupted?: boolean }[];
+  resonanceChange?: number;
+  narrativeResponse?: string;
 }
 
 // Local procedural algorithm to save tokens
@@ -108,7 +111,10 @@ export async function generateDMResponse(
   const tileName = tileNames[tileType] || 'Unknown Terrain';
   const localMapStr = localMap.map(t => `(${t.x},${t.y}): ${tileNames[t.type]}`).join(', ');
   
-  const prompt = `You are the "Atlas", an Agentic AI acting as the core reality engine for an infinite procedural universe. 
+  const prompt = `You are the "Atlas", an Agentic AI acting as the core reality engine for Aetherhaven.
+The mission is to save Earth from becoming a barren Mars-like wasteland.
+The player must heal leylines, tame corrupted spirits (demons), and preserve the land by collecting mystical roses.
+
 The player just interacted with a ${tileName} tile at coordinates (X: ${x}, Y: ${y}).
 The player is currently standing at coordinates (X: ${playerPos.x}, Y: ${playerPos.y}).
 
@@ -118,21 +124,26 @@ ${localMapStr}
 Recent story context:
 ${recentContext}
 
-Your job is to silently generate the outcome of this action by modifying the map. Be mysterious, surprising, and creative.
+Your job is to silently generate the outcome of this action by modifying the map and spawning entities. Be mysterious, surprising, and creative.
 
 CRITICAL INSTRUCTION: You MUST actively BUILD and MODIFY the game world. 
-Whenever the player interacts with the world, you should change the map to reflect the consequences.
+Whenever the player interacts with the world, you should change the map or spawn entities to reflect the consequences.
 For example:
 - If they click a Tree, maybe it turns into a Path (3) or Sand (6).
 - If they click Grass, maybe a monolith (Wall 4) appears.
 - If they click Water, maybe a Path (3) forms a bridge or Sand (6) creates an island.
+- You can spawn entities: 'rose', 'sheep', 'shrine', 'crystal', 'fire', 'sign', 'leyline', 'demon'.
+- 'leyline' and 'demon' can be "isCorrupted: true".
 
 SAFETY RULES:
 - NEVER place a solid tile (1, 2, 4, 5, 7, 8) exactly on the player's current position (X: ${playerPos.x}, Y: ${playerPos.y}).
 - NEVER completely surround the player with solid tiles. Always ensure there is a walkable path (0, 3, 6) so they don't get trapped.
 
 Return a JSON object with:
-1. "mapUpdates": An array of objects {x, y, tileType} to change the map. YOU MUST PROVIDE MAP UPDATES to make the world feel alive, surprising, and reactive. DO NOT return a message or narration.
+1. "mapUpdates": An array of objects {x, y, tileType} to change the map.
+2. "entityUpdates": An array of objects {x, y, type, name, isCorrupted} to spawn entities.
+3. "resonanceChange": A number to change the world resonance by (e.g., -5 to +10).
+4. "narrativeResponse": A brief (1 sentence) narrative response to the action.
 
 Available Tile Types: 
 0: Grass, 1: Tree, 2: Water, 3: Path, 4: Wall, 5: Door, 6: Sand, 7: Deep Water, 8: Mountain.`;
@@ -158,7 +169,24 @@ Available Tile Types:
                 },
                 required: ["x", "y", "tileType"]
               }
-            }
+            },
+            entityUpdates: {
+              type: Type.ARRAY,
+              description: "Any new entities to spawn.",
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  x: { type: Type.INTEGER },
+                  y: { type: Type.INTEGER },
+                  type: { type: Type.STRING, description: "rose, sheep, shrine, crystal, fire, sign, leyline, demon" },
+                  name: { type: Type.STRING },
+                  isCorrupted: { type: Type.BOOLEAN }
+                },
+                required: ["x", "y", "type"]
+              }
+            },
+            resonanceChange: { type: Type.NUMBER },
+            narrativeResponse: { type: Type.STRING }
           },
           required: ["mapUpdates"]
         }
@@ -167,7 +195,10 @@ Available Tile Types:
     
     const result = JSON.parse(response.text || "{}");
     return {
-      mapUpdates: result.mapUpdates || []
+      mapUpdates: result.mapUpdates || [],
+      entityUpdates: result.entityUpdates || [],
+      resonanceChange: result.resonanceChange || 0,
+      narrativeResponse: result.narrativeResponse || ""
     };
   } catch (error) {
     console.error("DM Error:", error);
