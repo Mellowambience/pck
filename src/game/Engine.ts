@@ -1,5 +1,4 @@
-import { TILE_SIZE, CHUNK_SIZE, generateChunk } from './MapData';
-import { loadSprite, SPRITE_KEYS } from '../services/SpriteGenerator';
+import { TILE_SIZE, CHUNK_SIZE, generateChunk, TILE_GRASS, TILE_TALL_GRASS, TILE_WATER, TILE_PATH, TILE_TREE } from './MapData';
 
 export interface Entity {
   id: string;
@@ -21,6 +20,11 @@ export class GameEngine {
   globalTime: number = 0;
   dayTime: number = 0; // 0 to 1, representing day cycle
   onInteract: (x: number, y: number, tileType: number) => void;
+  onEntityInteract: (entity: Entity) => void;
+  onEncounter?: (creature: any) => void;
+
+  isPaused: boolean = false;
+  zoom: number = 3; // Zoomed in focus
 
   player = {
     gridX: 9,
@@ -42,15 +46,28 @@ export class GameEngine {
 
   chunks: Map<string, number[][]> = new Map();
   entities: Entity[] = [];
-  spriteImages: Record<string, HTMLImageElement> = {};
+  sprites: Record<string, string[]> = {};
+  apiKey: string = '';
   
   fireflies: {x: number, y: number, phase: number, speed: number}[] = [];
+  keys: Record<string, boolean> = {};
 
-  constructor(canvas: HTMLCanvasElement, onInteract: (x: number, y: number, tileType: number) => void, public onEntityInteract: (entity: Entity) => void) {
+  lastTileX: number = 9;
+  lastTileY: number = 8;
+
+  constructor(
+    canvas: HTMLCanvasElement, 
+    onInteract: (x: number, y: number, tileType: number) => void, 
+    onEntityInteract: (entity: Entity) => void,
+    onEncounter?: (creature: any) => void,
+    apiKey?: string
+  ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.onInteract = onInteract;
-    this.loadSprites();
+    this.onEntityInteract = onEntityInteract;
+    this.onEncounter = onEncounter;
+    this.apiKey = apiKey || '';
     
     // Initialize fireflies
     for (let i = 0; i < 50; i++) {
@@ -61,22 +78,54 @@ export class GameEngine {
         speed: 0.5 + Math.random() * 1.5
       });
     }
+
+    window.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keyup', this.handleKeyUp);
+    
+    this.loadSprites();
   }
 
-  public loadSprites() {
-    SPRITE_KEYS.forEach(key => {
-      const dataUrl = loadSprite(key);
-      if (dataUrl) {
-        const img = new Image();
-        img.src = dataUrl;
-        img.onload = () => {
-          this.spriteImages[key] = img;
-        };
-      } else {
-        delete this.spriteImages[key];
+  public async loadSprites() {
+    if (!this.apiKey) return;
+    
+    const entitiesToGenerate = [
+      { id: 'player', prompt: 'A tiny 16x16 pixel art RPG hero character, top-down view.' },
+      { id: 'rose', prompt: 'A glowing mystical red rose, 16x16 pixel art.' },
+      { id: 'sheep', prompt: 'A fluffy white sheep, 16x16 pixel art, top-down view.' },
+      { id: 'shrine', prompt: 'An ancient stone shrine with glowing runes, 16x16 pixel art.' },
+      { id: 'crystal', prompt: 'A glowing purple aether crystal, 16x16 pixel art.' },
+      { id: 'fire', prompt: 'A corrupted red and black mars-flame, 16x16 pixel art.' },
+      { id: 'sign', prompt: 'A small wooden signpost, 16x16 pixel art.' },
+      { id: 'leyline', prompt: 'A glowing blue magical leyline node on the ground, 16x16 pixel art.' },
+      { id: 'demon', prompt: 'A dark, shadowy corrupted spirit with red eyes, 16x16 pixel art.' }
+    ];
+
+    for (const entity of entitiesToGenerate) {
+      if (this.sprites[entity.id]) continue;
+      try {
+        const response = await fetch('/api/generate-sprite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: entity.prompt, id: entity.id, apiKey: this.apiKey })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          this.sprites[entity.id] = data.pixels;
+        }
+      } catch (err) {
+        console.error(`Failed to load sprite for ${entity.id}`, err);
       }
-    });
+    }
   }
+
+  private handleKeyDown = (e: KeyboardEvent) => {
+    if (this.isPaused) return;
+    this.keys[e.key.toLowerCase()] = true;
+  };
+
+  private handleKeyUp = (e: KeyboardEvent) => {
+    this.keys[e.key.toLowerCase()] = false;
+  };
 
   private loadChunk(cx: number, cy: number) {
     const key = this.getChunkKey(cx, cy);
@@ -88,7 +137,7 @@ export class GameEngine {
         const ex = cx * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
         const ey = cy * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
         const localTile = this.chunks.get(key)![ey - cy * CHUNK_SIZE][ex - cx * CHUNK_SIZE];
-        const solidTiles = [1, 2, 4, 5, 7, 8];
+        const solidTiles = [TILE_WATER, TILE_TREE];
         
         if (!solidTiles.includes(localTile)) {
           const rand = Math.random();
@@ -139,6 +188,18 @@ export class GameEngine {
     }
   }
 
+  public spawnEntity(x: number, y: number, type: Entity['type'], name: string, isCorrupted: boolean = false) {
+    this.entities.push({
+      id: Math.random().toString(36).substring(2, 9),
+      gridX: x, gridY: y,
+      pixelX: x * TILE_SIZE, pixelY: y * TILE_SIZE,
+      type: type,
+      name: name,
+      isMoving: false,
+      isCorrupted: isCorrupted
+    });
+  }
+
   getChunkKey(cx: number, cy: number) {
     return `${cx},${cy}`;
   }
@@ -165,15 +226,19 @@ export class GameEngine {
 
   cleanup() {
     cancelAnimationFrame(this.animationFrameId);
+    window.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('keyup', this.handleKeyUp);
   }
 
   public handleMouseMove(clickX: number, clickY: number) {
+    if (this.isPaused) return;
     const { gridX, gridY } = this.screenToGrid(clickX, clickY);
     this.hoverX = gridX;
     this.hoverY = gridY;
   }
 
   public handleCanvasClick(clickX: number, clickY: number) {
+    if (this.isPaused) return;
     const { gridX, gridY } = this.screenToGrid(clickX, clickY);
 
     const clickedEnt = this.entities.find(e => e.gridX === gridX && e.gridY === gridY);
@@ -194,10 +259,10 @@ export class GameEngine {
   }
 
   private screenToGrid(screenX: number, screenY: number) {
-    const cameraX = Math.floor(this.canvas.width / 2 - this.player.pixelX - (TILE_SIZE / 2));
-    const cameraY = Math.floor(this.canvas.height / 2 - this.player.pixelY - (TILE_SIZE / 2));
-    const worldX = screenX - cameraX;
-    const worldY = screenY - cameraY;
+    const cameraX = Math.floor(this.canvas.width / 2 - this.player.pixelX * this.zoom - (TILE_SIZE * this.zoom / 2));
+    const cameraY = Math.floor(this.canvas.height / 2 - this.player.pixelY * this.zoom - (TILE_SIZE * this.zoom / 2));
+    const worldX = (screenX - cameraX) / this.zoom;
+    const worldY = (screenY - cameraY) / this.zoom;
     return {
       gridX: Math.floor(worldX / TILE_SIZE),
       gridY: Math.floor(worldY / TILE_SIZE)
@@ -229,7 +294,7 @@ export class GameEngine {
 
   private isSolid(x: number, y: number) {
     const tile = this.getTile(x, y);
-    const isTileSolid = tile === 1 || tile === 2 || tile === 4 || tile === 5 || tile === 7 || tile === 8;
+    const isTileSolid = tile === TILE_WATER || tile === TILE_TREE;
     const isEntitySolid = this.entities.some(e => {
       if (e.gridX !== x || e.gridY !== y) return false;
       // Roses, fire, and leylines are not solid, everything else is
@@ -331,7 +396,44 @@ export class GameEngine {
     }
   }
 
+  private triggerEncounter() {
+    this.isPaused = true;
+    this.keys = {};
+    this.player.path = [];
+    
+    const monsters = [
+      { name: 'Emberfox', type: 'Fire', hp: 20, maxHp: 20, color: '#ff5500', level: Math.floor(Math.random() * 5) + 2, shield: 2 },
+      { name: 'Aquapup', type: 'Water', hp: 22, maxHp: 22, color: '#00aaff', level: Math.floor(Math.random() * 5) + 2, shield: 3 },
+      { name: 'Leafbug', type: 'Grass', hp: 18, maxHp: 18, color: '#55aa00', level: Math.floor(Math.random() * 5) + 2, shield: 1 },
+      { name: 'Aether-kin', type: 'Fairy', hp: 25, maxHp: 25, color: '#e0aaff', level: Math.floor(Math.random() * 5) + 5, shield: 4 },
+    ];
+    const wild = monsters[Math.floor(Math.random() * monsters.length)];
+    
+    if (this.onEncounter) {
+      this.onEncounter(wild);
+    }
+  }
+
   private update(deltaTime: number) {
+    if (this.isPaused) return;
+
+    if (this.player.path.length === 0 && !this.player.isMoving) {
+      let dx = 0;
+      let dy = 0;
+      if (this.keys['w'] || this.keys['arrowup']) { dy = -1; this.player.direction = 'up'; }
+      else if (this.keys['s'] || this.keys['arrowdown']) { dy = 1; this.player.direction = 'down'; }
+      else if (this.keys['a'] || this.keys['arrowleft']) { dx = -1; this.player.direction = 'left'; }
+      else if (this.keys['d'] || this.keys['arrowright']) { dx = 1; this.player.direction = 'right'; }
+
+      if (dx !== 0 || dy !== 0) {
+        const nextX = this.player.gridX + dx;
+        const nextY = this.player.gridY + dy;
+        if (!this.isSolid(nextX, nextY)) {
+          this.player.path.push({x: nextX, y: nextY});
+        }
+      }
+    }
+
     if (!this.player.isMoving) {
       if (this.player.path.length > 0) {
         const nextStep = this.player.path.shift()!;
@@ -367,6 +469,18 @@ export class GameEngine {
       if (this.player.pixelX === targetPixelX && this.player.pixelY === targetPixelY) {
         this.player.isMoving = false;
         
+        if (this.player.gridX !== this.lastTileX || this.player.gridY !== this.lastTileY) {
+          this.lastTileX = this.player.gridX;
+          this.lastTileY = this.player.gridY;
+          
+          const currentTile = this.getTile(this.player.gridX, this.player.gridY);
+          if (currentTile === TILE_TALL_GRASS) {
+            if (Math.random() < 0.15) {
+              this.triggerEncounter();
+            }
+          }
+        }
+
         // Check for rose collection
         const roseIndex = this.entities.findIndex(e => e.type === 'rose' && e.gridX === this.player.gridX && e.gridY === this.player.gridY);
         if (roseIndex !== -1) {
@@ -415,16 +529,47 @@ export class GameEngine {
     }
   }
 
+  private drawSprite(px: number, py: number, pixels: string[]) {
+    if (!pixels || pixels.length !== 256) return false;
+    
+    for (let i = 0; i < 256; i++) {
+      const color = pixels[i];
+      if (color && color !== "") {
+        const x = i % 16;
+        const y = Math.floor(i / 16);
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(px + x * 2, py + y * 2, 2, 2);
+      }
+    }
+    return true;
+  }
+
   private draw() {
     const { ctx, canvas } = this;
     ctx.fillStyle = '#0f172a'; // Darker background
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const cameraX = Math.floor(canvas.width / 2 - this.player.pixelX - (TILE_SIZE / 2));
-    const cameraY = Math.floor(canvas.height / 2 - this.player.pixelY - (TILE_SIZE / 2));
+    const cameraX = Math.floor(canvas.width / 2 - this.player.pixelX * this.zoom - (TILE_SIZE * this.zoom / 2));
+    const cameraY = Math.floor(canvas.height / 2 - this.player.pixelY * this.zoom - (TILE_SIZE * this.zoom / 2));
+
+    // Parallax Background
+    ctx.save();
+    const parallaxX = cameraX * 0.2;
+    const parallaxY = cameraY * 0.2;
+    ctx.translate(parallaxX % 100, parallaxY % 100);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    for (let i = -100; i < canvas.width + 100; i += 50) {
+      for (let j = -100; j < canvas.height + 100; j += 50) {
+        ctx.beginPath();
+        ctx.arc(i, j, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
 
     ctx.save();
     ctx.translate(cameraX, cameraY);
+    ctx.scale(this.zoom, this.zoom);
 
     const pseudoRandom = (x: number, y: number) => {
       const sin = Math.sin(x * 12.9898 + y * 78.233);
@@ -432,10 +577,10 @@ export class GameEngine {
     };
 
     // Calculate visible bounds to optimize drawing
-    const startCol = Math.floor(-cameraX / TILE_SIZE);
-    const endCol = Math.ceil((canvas.width - cameraX) / TILE_SIZE);
-    const startRow = Math.floor(-cameraY / TILE_SIZE);
-    const endRow = Math.ceil((canvas.height - cameraY) / TILE_SIZE);
+    const startCol = Math.floor(-cameraX / (TILE_SIZE * this.zoom)) - 1;
+    const endCol = Math.ceil((canvas.width - cameraX) / (TILE_SIZE * this.zoom)) + 1;
+    const startRow = Math.floor(-cameraY / (TILE_SIZE * this.zoom)) - 1;
+    const endRow = Math.ceil((canvas.height - cameraY) / (TILE_SIZE * this.zoom)) + 1;
 
     for (let y = startRow; y <= endRow; y++) {
       for (let x = startCol; x <= endCol; x++) {
@@ -443,166 +588,54 @@ export class GameEngine {
         const px = x * TILE_SIZE;
         const py = y * TILE_SIZE;
         
-        const tileKeyMap: Record<number, string> = {
-          0: 'grass', 1: 'tree', 2: 'water', 3: 'path', 4: 'wall', 5: 'door', 6: 'sand', 7: 'deep_water', 8: 'mountain'
-        };
-        const spriteKey = tileKeyMap[tile];
+        // Base tile colors
+        if (tile === TILE_GRASS) ctx.fillStyle = '#4ade80'; // Grass
+        else if (tile === TILE_TREE) ctx.fillStyle = '#4ade80'; // Tree base (grass)
+        else if (tile === TILE_WATER) ctx.fillStyle = '#3b82f6'; // Water
+        else if (tile === TILE_PATH) ctx.fillStyle = '#d6d3d1'; // Path
+        else if (tile === TILE_TALL_GRASS) ctx.fillStyle = '#22c55e'; // Tall Grass
+        else ctx.fillStyle = '#000';
 
-        if (this.spriteImages[spriteKey]) {
-          // If it's a tree or mountain, draw grass underneath first
-          if (tile === 1 || tile === 8) {
-            if (this.spriteImages['grass']) {
-              ctx.drawImage(this.spriteImages['grass'], px, py, TILE_SIZE, TILE_SIZE);
-            } else {
-              ctx.fillStyle = '#4ade80';
-              ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-            }
-          }
-          ctx.drawImage(this.spriteImages[spriteKey], px, py, TILE_SIZE, TILE_SIZE);
-        } else {
-          // Base tile colors
-          if (tile === 0) ctx.fillStyle = '#4ade80'; // Grass
-          else if (tile === 1) ctx.fillStyle = '#4ade80'; // Tree base (grass)
-          else if (tile === 2) ctx.fillStyle = '#3b82f6'; // Water
-          else if (tile === 3) ctx.fillStyle = '#d6d3d1'; // Path
-          else if (tile === 4) ctx.fillStyle = '#78716c'; // Wall
-          else if (tile === 5) ctx.fillStyle = '#8b5cf6'; // Door
-          else if (tile === 6) ctx.fillStyle = '#fde047'; // Sand
-          else if (tile === 7) ctx.fillStyle = '#1e3a8a'; // Deep Water
-          else if (tile === 8) ctx.fillStyle = '#4ade80'; // Mountain base (grass)
+        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
-          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-
-          // Details
-          if (tile === 0 || tile === 1 || tile === 8) {
-            // Grass blades
-            ctx.fillStyle = '#22c55e';
-            for(let i=0; i<4; i++) {
-              let rx = pseudoRandom(x, y+i) * (TILE_SIZE - 2);
-              let ry = pseudoRandom(x+i, y) * (TILE_SIZE - 4);
-              ctx.fillRect(px + rx, py + ry, 2, 4);
-            }
-          }
-          
-          if (tile === 6) {
-            // Sand speckles
-            ctx.fillStyle = '#eab308';
-            for(let i=0; i<5; i++) {
-              let rx = pseudoRandom(x, y+i) * (TILE_SIZE - 2);
-              let ry = pseudoRandom(x+i, y) * (TILE_SIZE - 2);
-              ctx.fillRect(px + rx, py + ry, 2, 2);
-            }
-          }
-
-          if (tile === 2 || tile === 7) {
-            // Water waves
-            ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            let waveOffset = Math.sin(this.globalTime * 2 + x * 0.5 + y * 0.5) * 4;
-            ctx.fillRect(px + 4 + waveOffset, py + 8, 12, 2);
-            ctx.fillRect(px + 16 - waveOffset, py + 20, 10, 2);
-          }
-
-          if (tile === 1) {
-            // Tree shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.beginPath(); ctx.ellipse(px + 16, py + 28, 12, 6, 0, 0, Math.PI*2); ctx.fill();
-            // Trunk
-            ctx.fillStyle = '#78350f';
-            ctx.fillRect(px + 12, py + 16, 8, 14);
-            // Leaves (Pine)
-            ctx.fillStyle = '#166534';
-            ctx.beginPath(); ctx.moveTo(px + 16, py - 4); ctx.lineTo(px + 28, py + 20); ctx.lineTo(px + 4, py + 20); ctx.fill();
-            ctx.fillStyle = '#14532d'; // darker shade for depth
-            ctx.beginPath(); ctx.moveTo(px + 16, py - 4); ctx.lineTo(px + 28, py + 20); ctx.lineTo(px + 16, py + 20); ctx.fill();
-          } 
-          
-          if (tile === 8) {
-            // Mountain shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.4)';
-            ctx.beginPath(); ctx.ellipse(px + 16, py + 28, 18, 8, 0, 0, Math.PI*2); ctx.fill();
-            // Base
-            ctx.fillStyle = '#57534e';
-            ctx.beginPath(); ctx.moveTo(px + 16, py - 12); ctx.lineTo(px + 36, py + 32); ctx.lineTo(px - 4, py + 32); ctx.fill();
-            // Snow cap
-            ctx.fillStyle = '#e7e5e4';
-            ctx.beginPath(); ctx.moveTo(px + 16, py - 12); ctx.lineTo(px + 24, py + 6); ctx.lineTo(px + 16, py + 10); ctx.lineTo(px + 8, py + 6); ctx.fill();
+        // Details
+        if (tile === TILE_GRASS || tile === TILE_TREE || tile === TILE_TALL_GRASS) {
+          // Grass blades
+          ctx.fillStyle = tile === TILE_TALL_GRASS ? '#16a34a' : '#22c55e';
+          for(let i=0; i<4; i++) {
+            let rx = pseudoRandom(x, y+i) * (TILE_SIZE - 2);
+            let ry = pseudoRandom(x+i, y) * (TILE_SIZE - 4);
+            ctx.fillRect(px + rx, py + ry, 2, tile === TILE_TALL_GRASS ? 8 : 4);
           }
         }
 
+        if (tile === TILE_WATER) {
+          // Water waves
+          ctx.fillStyle = 'rgba(255,255,255,0.2)';
+          let waveOffset = Math.sin(this.globalTime * 2 + x * 0.5 + y * 0.5) * 4;
+          ctx.fillRect(px + 4 + waveOffset, py + 8, 12, 2);
+          ctx.fillRect(px + 16 - waveOffset, py + 20, 10, 2);
+        }
+
+        if (tile === TILE_TREE) {
+          // Tree shadow
+          ctx.fillStyle = 'rgba(0,0,0,0.3)';
+          ctx.beginPath(); ctx.ellipse(px + 16, py + 28, 12, 6, 0, 0, Math.PI*2); ctx.fill();
+          // Trunk
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(px + 12, py + 16, 8, 14);
+          // Leaves (Pine)
+          ctx.fillStyle = '#166534';
+          ctx.beginPath(); ctx.moveTo(px + 16, py - 4); ctx.lineTo(px + 28, py + 20); ctx.lineTo(px + 4, py + 20); ctx.fill();
+          ctx.fillStyle = '#14532d'; // darker shade for depth
+          ctx.beginPath(); ctx.moveTo(px + 16, py - 4); ctx.lineTo(px + 28, py + 20); ctx.lineTo(px + 16, py + 20); ctx.fill();
+        } 
+
         // Draw hover highlight
-        if (x === this.hoverX && y === this.hoverY) {
+        if (x === this.hoverX && y === this.hoverY && !this.isPaused) {
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
           ctx.lineWidth = 2;
           ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
-        }
-      }
-    }
-
-    // Draw Entities
-    for (const ent of this.entities) {
-      if (ent.gridX >= startCol && ent.gridX <= endCol && ent.gridY >= startRow && ent.gridY <= endRow) {
-        const px = ent.pixelX;
-        const py = ent.pixelY;
-        
-        if (this.spriteImages[ent.type]) {
-          ctx.drawImage(this.spriteImages[ent.type], px, py, TILE_SIZE, TILE_SIZE);
-        } else {
-          // Shadow
-          ctx.fillStyle = 'rgba(0,0,0,0.4)';
-          ctx.beginPath(); ctx.ellipse(px + 16, py + 28, 10, 5, 0, 0, Math.PI*2); ctx.fill();
-
-          if (ent.type === 'sheep') {
-            // Body
-            ctx.fillStyle = '#f8fafc';
-            ctx.beginPath(); ctx.ellipse(px + 16, py + 20, 12, 8, 0, 0, Math.PI*2); ctx.fill();
-            // Head
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(px + 22, py + 14, 6, 6);
-            // Legs
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(px + 10, py + 26, 2, 4);
-            ctx.fillRect(px + 20, py + 26, 2, 4);
-          } else if (ent.type === 'traveler') {
-            // Cloak
-            ctx.fillStyle = '#9f1239'; // red cloak
-            ctx.beginPath(); ctx.moveTo(px + 16, py + 8); ctx.lineTo(px + 24, py + 28); ctx.lineTo(px + 8, py + 28); ctx.fill();
-            // Head
-            ctx.fillStyle = '#fcd34d'; // skin
-            ctx.beginPath(); ctx.arc(px + 16, py + 10, 6, 0, Math.PI*2); ctx.fill();
-            // Hood
-            ctx.fillStyle = '#881337';
-            ctx.beginPath(); ctx.arc(px + 16, py + 8, 7, Math.PI, 0); ctx.fill();
-          } else if (ent.type === 'rose') {
-            ctx.fillStyle = '#e11d48';
-            ctx.beginPath(); ctx.arc(px + 16, py + 16, 4, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#16a34a';
-            ctx.fillRect(px + 15, py + 20, 2, 8);
-          } else if (ent.type === 'shrine') {
-            ctx.fillStyle = '#475569';
-            ctx.fillRect(px + 4, py + 4, 24, 24);
-            ctx.fillStyle = '#818cf8';
-            ctx.beginPath(); ctx.arc(px + 16, py + 16, 6, 0, Math.PI*2); ctx.fill();
-          } else if (ent.type === 'crystal') {
-            ctx.fillStyle = '#a855f7';
-            ctx.beginPath(); ctx.moveTo(px + 16, py + 4); ctx.lineTo(px + 24, py + 24); ctx.lineTo(px + 8, py + 24); ctx.fill();
-          } else if (ent.type === 'fire') {
-            ctx.fillStyle = '#f97316';
-            ctx.beginPath(); ctx.moveTo(px + 16, py + 8); ctx.lineTo(px + 24, py + 28); ctx.lineTo(px + 8, py + 28); ctx.fill();
-          } else if (ent.type === 'sign') {
-            ctx.fillStyle = '#78350f';
-            ctx.fillRect(px + 14, py + 16, 4, 14);
-            ctx.fillRect(px + 6, py + 8, 20, 10);
-          } else if (ent.type === 'leyline') {
-            const alpha = (Math.sin(this.globalTime * 2) + 1) / 2;
-            ctx.fillStyle = ent.isCorrupted ? `rgba(249, 115, 22, ${alpha * 0.5})` : `rgba(56, 189, 248, ${alpha * 0.8})`;
-            ctx.beginPath(); ctx.arc(px + 16, py + 16, 12, 0, Math.PI * 2); ctx.fill();
-          } else if (ent.type === 'demon') {
-            ctx.fillStyle = '#1e293b';
-            ctx.beginPath(); ctx.arc(px + 16, py + 16, 10, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#f97316';
-            ctx.fillRect(px + 12, py + 12, 2, 2);
-            ctx.fillRect(px + 18, py + 12, 2, 2);
-          }
         }
       }
     }
@@ -615,42 +648,172 @@ export class GameEngine {
       ctx.fill();
     }
 
-    // Draw Player
-    const px = this.player.pixelX;
-    const py = this.player.pixelY;
+    // Y-Sorting: Combine entities and player, sort by pixelY
+    const renderables = [
+      ...this.entities.filter(ent => ent.gridX >= startCol && ent.gridX <= endCol && ent.gridY >= startRow && ent.gridY <= endRow).map(ent => ({ ...ent, isPlayer: false })),
+      { ...this.player, isPlayer: true, type: 'player' as const }
+    ];
 
-    if (this.spriteImages['player']) {
-      ctx.drawImage(this.spriteImages['player'], px, py, TILE_SIZE, TILE_SIZE);
-    } else {
-      // Player Shadow
+    renderables.sort((a, b) => a.pixelY - b.pixelY);
+
+    for (const item of renderables) {
+      const px = item.pixelX;
+      const py = item.pixelY;
+
+      // Shadow
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
       ctx.beginPath(); ctx.ellipse(px + 16, py + 28, 10, 5, 0, 0, Math.PI*2); ctx.fill();
-      
-      // Player Body (Cloak)
-      ctx.fillStyle = '#6366f1'; // Indigo cloak
-      ctx.beginPath(); 
-      ctx.moveTo(px + 16, py + 8); 
-      ctx.lineTo(px + 24, py + 28); 
-      ctx.lineTo(px + 8, py + 28); 
-      ctx.fill();
-      
-      // Head
-      ctx.fillStyle = '#fcd34d'; // Skin
-      ctx.beginPath(); ctx.arc(px + 16, py + 10, 6, 0, Math.PI*2); ctx.fill();
-      
-      // Hood
-      ctx.fillStyle = '#4f46e5';
-      ctx.beginPath(); ctx.arc(px + 16, py + 8, 7, Math.PI, 0); ctx.fill();
 
-      // Direction indicator (eyes/face)
-      ctx.fillStyle = '#1e1b4b';
-      if (this.player.direction === 'down') {
-        ctx.fillRect(px + 13, py + 9, 2, 2);
-        ctx.fillRect(px + 17, py + 9, 2, 2);
-      } else if (this.player.direction === 'left') {
-        ctx.fillRect(px + 11, py + 9, 2, 2);
-      } else if (this.player.direction === 'right') {
-        ctx.fillRect(px + 19, py + 9, 2, 2);
+      if (item.isPlayer) {
+        if (this.sprites['player']) {
+          this.drawSprite(px, py, this.sprites['player']);
+        } else {
+          // Player Body (Jacket/Shirt)
+          ctx.fillStyle = '#3b82f6'; // Blue jacket
+          ctx.fillRect(px + 10, py + 14, 12, 10);
+          
+          // Arms
+          ctx.fillStyle = '#2563eb'; // Darker blue sleeves
+          ctx.fillRect(px + 8, py + 14, 4, 8);
+          ctx.fillRect(px + 20, py + 14, 4, 8);
+
+          // Hands
+          ctx.fillStyle = '#fcd34d'; // Skin
+          ctx.fillRect(px + 8, py + 22, 4, 3);
+          ctx.fillRect(px + 20, py + 22, 4, 3);
+
+          // Pants
+          ctx.fillStyle = '#1e293b'; // Dark pants
+          ctx.fillRect(px + 10, py + 24, 12, 6);
+
+          // Shoes
+          ctx.fillStyle = '#ef4444'; // Red shoes
+          ctx.fillRect(px + 9, py + 28, 6, 4);
+          ctx.fillRect(px + 17, py + 28, 6, 4);
+          
+          // Head
+          ctx.fillStyle = '#fcd34d'; // Skin
+          ctx.beginPath(); ctx.arc(px + 16, py + 10, 7, 0, Math.PI*2); ctx.fill();
+          
+          // Hat
+          ctx.fillStyle = '#ef4444'; // Red hat
+          ctx.beginPath(); ctx.arc(px + 16, py + 8, 7, Math.PI, 0); ctx.fill();
+          // Hat brim
+          if (this.player.direction === 'down') {
+            ctx.fillRect(px + 9, py + 7, 14, 2);
+          } else if (this.player.direction === 'left') {
+            ctx.fillRect(px + 7, py + 7, 8, 2);
+          } else if (this.player.direction === 'right') {
+            ctx.fillRect(px + 17, py + 7, 8, 2);
+          } else if (this.player.direction === 'up') {
+            // Brim in back, mostly hidden
+          }
+
+          // Direction indicator (eyes/face)
+          ctx.fillStyle = '#1e1b4b';
+          if (this.player.direction === 'down') {
+            ctx.fillRect(px + 13, py + 10, 2, 2);
+            ctx.fillRect(px + 17, py + 10, 2, 2);
+          } else if (this.player.direction === 'left') {
+            ctx.fillRect(px + 11, py + 10, 2, 2);
+          } else if (this.player.direction === 'right') {
+            ctx.fillRect(px + 19, py + 10, 2, 2);
+          }
+        }
+      } else {
+        const ent = item as any;
+        if (this.sprites[ent.type]) {
+          this.drawSprite(px, py, this.sprites[ent.type]);
+        } else if (ent.type === 'sheep') {
+          // Body
+          ctx.fillStyle = '#f8fafc';
+          ctx.beginPath(); ctx.ellipse(px + 16, py + 20, 12, 8, 0, 0, Math.PI*2); ctx.fill();
+          // Head
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(px + 22, py + 14, 6, 6);
+          // Legs
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(px + 10, py + 26, 2, 4);
+          ctx.fillRect(px + 20, py + 26, 2, 4);
+        } else if (ent.type === 'traveler') {
+          // Body (Jacket/Shirt)
+          ctx.fillStyle = '#10b981'; // Green jacket
+          ctx.fillRect(px + 10, py + 14, 12, 10);
+          
+          // Arms
+          ctx.fillStyle = '#059669'; // Darker green sleeves
+          ctx.fillRect(px + 8, py + 14, 4, 8);
+          ctx.fillRect(px + 20, py + 14, 4, 8);
+
+          // Hands
+          ctx.fillStyle = '#fcd34d'; // Skin
+          ctx.fillRect(px + 8, py + 22, 4, 3);
+          ctx.fillRect(px + 20, py + 22, 4, 3);
+
+          // Pants
+          ctx.fillStyle = '#1e293b'; // Dark pants
+          ctx.fillRect(px + 10, py + 24, 12, 6);
+
+          // Shoes
+          ctx.fillStyle = '#f59e0b'; // Orange shoes
+          ctx.fillRect(px + 9, py + 28, 6, 4);
+          ctx.fillRect(px + 17, py + 28, 6, 4);
+          
+          // Head
+          ctx.fillStyle = '#fcd34d'; // Skin
+          ctx.beginPath(); ctx.arc(px + 16, py + 10, 7, 0, Math.PI*2); ctx.fill();
+          
+          // Hair
+          ctx.fillStyle = '#78350f'; // Brown hair
+          ctx.beginPath(); ctx.arc(px + 16, py + 8, 7, Math.PI, 0); ctx.fill();
+          ctx.fillRect(px + 9, py + 7, 14, 3);
+        } else if (ent.type === 'rose') {
+          ctx.fillStyle = '#e11d48';
+          ctx.beginPath(); ctx.arc(px + 16, py + 16, 4, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#16a34a';
+          ctx.fillRect(px + 15, py + 20, 2, 8);
+        } else if (ent.type === 'shrine') {
+          ctx.fillStyle = '#475569';
+          ctx.fillRect(px + 4, py + 4, 24, 24);
+          ctx.fillStyle = '#818cf8';
+          ctx.beginPath(); ctx.arc(px + 16, py + 16, 6, 0, Math.PI*2); ctx.fill();
+        } else if (ent.type === 'crystal') {
+          ctx.fillStyle = '#a855f7';
+          ctx.beginPath(); ctx.moveTo(px + 16, py + 4); ctx.lineTo(px + 24, py + 24); ctx.lineTo(px + 8, py + 24); ctx.fill();
+          
+          // Crystal particles
+          const t = this.globalTime * 2;
+          ctx.fillStyle = 'rgba(216, 180, 254, 0.6)';
+          for (let i = 0; i < 3; i++) {
+            const offset = (t + i * 2) % 4;
+            ctx.fillRect(px + 12 + Math.sin(t + i)*8, py + 20 - offset*4, 2, 2);
+          }
+        } else if (ent.type === 'fire') {
+          ctx.fillStyle = '#f97316';
+          ctx.beginPath(); ctx.moveTo(px + 16, py + 8); ctx.lineTo(px + 24, py + 28); ctx.lineTo(px + 8, py + 28); ctx.fill();
+          
+          // Fire particles
+          const t = this.globalTime * 5;
+          ctx.fillStyle = 'rgba(253, 186, 116, 0.8)';
+          for (let i = 0; i < 4; i++) {
+            const offset = (t + i * 1.5) % 5;
+            ctx.fillRect(px + 14 + Math.sin(t + i)*4, py + 24 - offset*3, 3, 3);
+          }
+        } else if (ent.type === 'sign') {
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(px + 14, py + 16, 4, 14);
+          ctx.fillRect(px + 6, py + 8, 20, 10);
+        } else if (ent.type === 'leyline') {
+          const alpha = (Math.sin(this.globalTime * 2) + 1) / 2;
+          ctx.fillStyle = ent.isCorrupted ? `rgba(249, 115, 22, ${alpha * 0.5})` : `rgba(56, 189, 248, ${alpha * 0.8})`;
+          ctx.beginPath(); ctx.arc(px + 16, py + 16, 12, 0, Math.PI * 2); ctx.fill();
+        } else if (ent.type === 'demon') {
+          ctx.fillStyle = '#1e293b';
+          ctx.beginPath(); ctx.arc(px + 16, py + 16, 10, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#f97316';
+          ctx.fillRect(px + 12, py + 12, 2, 2);
+          ctx.fillRect(px + 18, py + 12, 2, 2);
+        }
       }
     }
 
@@ -672,16 +835,16 @@ export class GameEngine {
           
           ctx.fillStyle = `rgba(167, 243, 208, ${alpha})`; // Emerald-200
           ctx.beginPath();
-          ctx.arc(ff.x, ff.y, 1.5, 0, Math.PI * 2);
+          ctx.arc(ff.x, ff.y, 1.5 / this.zoom, 0, Math.PI * 2);
           ctx.fill();
           
           // Glow
-          const glow = ctx.createRadialGradient(ff.x, ff.y, 0, ff.x, ff.y, 8);
+          const glow = ctx.createRadialGradient(ff.x, ff.y, 0, ff.x, ff.y, 8 / this.zoom);
           glow.addColorStop(0, `rgba(167, 243, 208, ${alpha * 0.5})`);
           glow.addColorStop(1, 'rgba(167, 243, 208, 0)');
           ctx.fillStyle = glow;
           ctx.beginPath();
-          ctx.arc(ff.x, ff.y, 8, 0, Math.PI * 2);
+          ctx.arc(ff.x, ff.y, 8 / this.zoom, 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -692,26 +855,51 @@ export class GameEngine {
 
     // Day/Night Cycle Overlay
     if (darkness > 0) {
+      // Create a dark overlay
       ctx.fillStyle = `rgba(10, 10, 30, ${darkness})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      // Add a soft light around the player at night
+      // Add a soft light around the player at night using destination-out
       if (darkness > 0.3) {
-        const playerScreenX = px + cameraX + 16;
-        const playerScreenY = py + cameraY + 16;
+        ctx.globalCompositeOperation = 'destination-out';
+        const playerScreenX = canvas.width / 2;
+        const playerScreenY = canvas.height / 2;
         
         const gradient = ctx.createRadialGradient(
           playerScreenX, playerScreenY, 0,
-          playerScreenX, playerScreenY, 150
+          playerScreenX, playerScreenY, 150 * this.zoom
         );
-        gradient.addColorStop(0, `rgba(255, 200, 100, ${darkness * 0.5})`);
-        gradient.addColorStop(1, 'rgba(255, 200, 100, 0)');
+        gradient.addColorStop(0, `rgba(0, 0, 0, ${darkness * 0.8})`);
+        gradient.addColorStop(0.5, `rgba(0, 0, 0, ${darkness * 0.4})`);
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
         
-        ctx.globalCompositeOperation = 'screen';
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(playerScreenX, playerScreenY, 150, 0, Math.PI * 2);
+        ctx.arc(playerScreenX, playerScreenY, 150 * this.zoom, 0, Math.PI * 2);
         ctx.fill();
+
+        // Also add light cutouts for glowing entities (like fire, shrine, crystals)
+        for (const ent of this.entities) {
+          if (ent.type === 'fire' || ent.type === 'crystal' || ent.type === 'shrine' || ent.type === 'leyline') {
+            const entScreenX = (ent.pixelX * this.zoom) + cameraX * this.zoom + (16 * this.zoom);
+            const entScreenY = (ent.pixelY * this.zoom) + cameraY * this.zoom + (16 * this.zoom);
+            
+            // Only draw if on screen
+            if (entScreenX > -100 && entScreenX < canvas.width + 100 && entScreenY > -100 && entScreenY < canvas.height + 100) {
+              const entGradient = ctx.createRadialGradient(
+                entScreenX, entScreenY, 0,
+                entScreenX, entScreenY, 80 * this.zoom
+              );
+              entGradient.addColorStop(0, `rgba(0, 0, 0, ${darkness * 0.9})`);
+              entGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+              
+              ctx.fillStyle = entGradient;
+              ctx.beginPath();
+              ctx.arc(entScreenX, entScreenY, 80 * this.zoom, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
         ctx.globalCompositeOperation = 'source-over';
       }
     }

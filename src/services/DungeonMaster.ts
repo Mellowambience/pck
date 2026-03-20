@@ -84,8 +84,26 @@ Respond in character. Keep it brief (1-3 sentences). Be mysterious, quirky, or h
     const response = await client.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            response: {
+              type: Type.STRING,
+              description: "The NPC's spoken response."
+            }
+          },
+          required: ["response"]
+        }
+      }
     });
-    return response.text || "*silence*";
+    
+    if (response.text) {
+        const data = JSON.parse(response.text);
+        return data.response || "*silence*";
+    }
+    return "*silence*";
   } catch (error) {
     console.error("NPC Error:", error);
     return "*The traveler seems lost in thought.*";

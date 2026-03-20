@@ -2,13 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GameCanvas, GameCanvasRef } from './components/GameCanvas';
 import { generateDMResponse, generateProceduralResponse, generateNPCResponse } from './services/DungeonMaster';
 import { tileNames } from './game/MapData';
-import { Sparkles, Zap, MessageSquare, X, Send, Key, Image as ImageIcon, Map as MapIcon } from 'lucide-react';
-import { AssetStudio } from './components/AssetStudio';
+import { Sparkles, Zap, MessageSquare, X, Send, Key, Map as MapIcon } from 'lucide-react';
 import { Minimap } from './components/Minimap';
 import { Clock } from './components/Clock';
 import { auth, db } from './firebase';
 import { signInAnonymously, onAuthStateChanged, User, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { BattleScreen } from './components/BattleScreen';
+import { AnimatePresence } from 'motion/react';
 
 export default function App() {
   const [isThinking, setIsThinking] = useState(false);
@@ -24,11 +25,11 @@ export default function App() {
   const [chatInput, setChatInput] = useState("");
   const [isChatting, setIsChatting] = useState(false);
   const [showApiConfig, setShowApiConfig] = useState(false);
-  const [showAssetStudio, setShowAssetStudio] = useState(false);
   const [roseCount, setRoseCount] = useState(0);
   const [leylinesHealed, setLeylinesHealed] = useState(0);
   const [demonsTamed, setDemonsTamed] = useState(0);
   const [apiKey, setApiKey] = useState(process.env.GEMINI_API_KEY || "");
+  const [battleState, setBattleState] = useState<any>(null);
   
   // Engine State
   const [minimapData, setMinimapData] = useState<number[]>([]);
@@ -121,17 +122,6 @@ export default function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
-
-  const handleSpritesUpdated = () => {
-    if (gameRef.current) {
-      // Force the game engine to reload sprites
-      // We can do this by calling a method on the ref if we expose it, 
-      // or just re-mounting the canvas, but exposing a method is better.
-      // For now, we'll just let the user refresh or we can add a reload method to GameCanvasRef.
-      // Let's add a reloadSprites method to GameCanvasRef.
-      gameRef.current.reloadSprites();
-    }
-  };
 
   const handleEntityInteract = (entity: any) => {
     if (entity.type === 'rose') return; // Roses are collected on move
@@ -275,7 +265,26 @@ export default function App() {
         onEntityInteract={handleEntityInteract} 
         onRoseCollected={(count) => setRoseCount(count)}
         onLeylineHealed={(count) => setLeylinesHealed(count)}
+        onEncounter={(creature) => setBattleState(creature)}
+        apiKey={apiKey}
       />
+
+      {/* Battle Screen Overlay */}
+      <AnimatePresence>
+        {battleState && (
+          <BattleScreen 
+            wildCreature={battleState} 
+            onFlee={() => {
+              setBattleState(null);
+              gameRef.current?.resumeGame();
+            }}
+            onCatch={() => {
+              setBattleState(null);
+              gameRef.current?.resumeGame();
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Minimap & Clock */}
       <div className="absolute bottom-6 left-6 z-40 flex flex-col gap-4 pointer-events-none">
@@ -293,13 +302,6 @@ export default function App() {
           title="API Configuration"
         >
           <Key className="w-5 h-5" />
-        </button>
-        <button 
-          onClick={() => setShowAssetStudio(true)}
-          className="p-2 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
-          title="Asset Studio"
-        >
-          <ImageIcon className="w-5 h-5" />
         </button>
         {!user || user.isAnonymous ? (
           <button 
@@ -356,15 +358,6 @@ export default function App() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Asset Studio Modal */}
-      {showAssetStudio && (
-        <AssetStudio 
-          onClose={() => setShowAssetStudio(false)} 
-          apiKey={apiKey} 
-          onSpritesUpdated={handleSpritesUpdated} 
-        />
       )}
 
       {/* Mission Log */}

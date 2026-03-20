@@ -6,25 +6,28 @@ interface Props {
   onEntityInteract: (entity: any) => void;
   onRoseCollected?: (count: number) => void;
   onLeylineHealed?: (count: number) => void;
+  onEncounter?: (creature: any) => void;
+  apiKey?: string;
 }
 
 export interface GameCanvasRef {
   updateMap: (updates: {x: number, y: number, tileType: number}[]) => void;
   getMapWindow: (x: number, y: number, radius: number) => {x: number, y: number, type: number}[];
   getPlayerPosition: () => { x: number, y: number };
-  reloadSprites: () => void;
   spawnEntity: (x: number, y: number, type: 'rose' | 'sheep' | 'shrine' | 'crystal' | 'fire' | 'sign' | 'leyline' | 'demon', name?: string, isCorrupted?: boolean) => void;
   getMinimapData: (radius: number) => number[];
   getTimeOfDay: () => number;
+  resumeGame: () => void;
 }
 
-export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEntityInteract, onRoseCollected, onLeylineHealed }, ref) => {
+export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEntityInteract, onRoseCollected, onLeylineHealed, onEncounter, apiKey }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const onInteractRef = useRef(onInteract);
   const onEntityInteractRef = useRef(onEntityInteract);
   const onRoseCollectedRef = useRef(onRoseCollected);
   const onLeylineHealedRef = useRef(onLeylineHealed);
+  const onEncounterRef = useRef(onEncounter);
 
   useEffect(() => {
     onInteractRef.current = onInteract;
@@ -43,6 +46,17 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
   }, [onLeylineHealed]);
 
   useEffect(() => {
+    onEncounterRef.current = onEncounter;
+  }, [onEncounter]);
+
+  useEffect(() => {
+    if (engineRef.current && apiKey) {
+      engineRef.current.apiKey = apiKey;
+      engineRef.current.loadSprites();
+    }
+  }, [apiKey]);
+
+  useEffect(() => {
     if (!canvasRef.current) return;
     
     const resizeCanvas = () => {
@@ -58,7 +72,9 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
     const engine = new GameEngine(
       canvasRef.current, 
       (x, y, t) => onInteractRef.current(x, y, t),
-      (entity) => onEntityInteractRef.current(entity)
+      (entity) => onEntityInteractRef.current(entity),
+      (creature) => onEncounterRef.current?.(creature),
+      apiKey
     );
     engine.onRoseCollected = (count) => onRoseCollectedRef.current?.(count);
     engine.onLeylineHealed = (count) => onLeylineHealedRef.current?.(count);
@@ -75,7 +91,7 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
     updateMap: (updates) => {
       if (engineRef.current) {
         const engine = engineRef.current;
-        const solidTiles = [1, 2, 4, 5, 7, 8]; // Tree, Water, Wall, Door, Deep Water, Mountain
+        const solidTiles = [2, 4]; // Water, Tree
         
         let pathBlocked = false;
 
@@ -123,11 +139,6 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
       }
       return { x: 0, y: 0 };
     },
-    reloadSprites: () => {
-      if (engineRef.current) {
-        engineRef.current.loadSprites();
-      }
-    },
     spawnEntity: (x, y, type, name, isCorrupted) => {
       if (engineRef.current) {
         engineRef.current.spawnEntity(x, y, type, name, isCorrupted);
@@ -144,6 +155,11 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
         return engineRef.current.getTimeOfDay();
       }
       return 0;
+    },
+    resumeGame: () => {
+      if (engineRef.current) {
+        engineRef.current.isPaused = false;
+      }
     }
   }));
 
