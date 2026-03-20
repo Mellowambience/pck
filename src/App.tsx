@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GameCanvas, GameCanvasRef } from './components/GameCanvas';
-import { generateDMResponse, generateProceduralResponse, generateNPCResponse } from './services/DungeonMaster';
+import { generateProceduralResponse } from './services/ProceduralWorld';
 import { tileNames } from './game/MapData';
 import { Sparkles, Zap, MessageSquare, X, Send, Key, Map as MapIcon } from 'lucide-react';
 import { Minimap } from './components/Minimap';
@@ -187,6 +187,7 @@ export default function App() {
     const localMap = gameRef.current?.getMapWindow(activeNPC.gridX, activeNPC.gridY, 3) || [];
     const localMapStr = localMap.map(t => `(${t.x},${t.y}): ${tileNames[t.type]}`).join(', ');
     
+    const { generateNPCResponse } = await import('./services/DungeonMaster');
     const response = await generateNPCResponse(activeNPC.name, activeNPC.type, userMsg, localMapStr, apiKey);
     setChatHistory(prev => [...prev, { role: 'npc', text: response }]);
     setIsChatting(false);
@@ -210,6 +211,7 @@ export default function App() {
       setIsThinking(true);
       try {
         const localMap = gameRef.current?.getMapWindow(x, y, 2) || [];
+        const { generateDMResponse } = await import('./services/DungeonMaster');
         const response = await generateDMResponse(x, y, tileType, "", localMap, playerPos, apiKey);
         
         if (response.mapUpdates && response.mapUpdates.length > 0) {
