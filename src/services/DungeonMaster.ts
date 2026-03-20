@@ -10,61 +10,6 @@ export interface DMResponse {
   narrativeResponse?: string;
 }
 
-// Local procedural algorithm to save tokens
-export function generateProceduralResponse(x: number, y: number, clickedTile: number, playerPos: {x: number, y: number}): DMResponse {
-  const updates: {x: number, y: number, tileType: number}[] = [];
-  const neighbors = [
-    {dx: 0, dy: -1}, {dx: 1, dy: 0}, {dx: 0, dy: 1}, {dx: -1, dy: 0},
-    {dx: -1, dy: -1}, {dx: 1, dy: -1}, {dx: -1, dy: 1}, {dx: 1, dy: 1}
-  ];
-
-  // Procedural rules based on clicked tile
-  switch (clickedTile) {
-    case 0: // Grass
-      updates.push({ x, y, tileType: Math.random() > 0.7 ? 1 : 3 }); // Grow tree or make path
-      break;
-    case 1: // Tree
-      updates.push({ x, y, tileType: 0 }); // Chop down
-      break;
-    case 2: // Water
-      // Spread water to a random cardinal neighbor
-      const n = neighbors[Math.floor(Math.random() * 4)]; 
-      updates.push({ x: x + n.dx, y: y + n.dy, tileType: 2 });
-      if (Math.random() > 0.8) updates.push({ x, y, tileType: 7 }); // Deepen
-      break;
-    case 3: // Path
-      updates.push({ x, y, tileType: 6 }); // Degrade to sand
-      break;
-    case 4: // Wall
-      updates.push({ x, y, tileType: 8 }); // Turn to mountain
-      break;
-    case 6: // Sand
-      updates.push({ x, y, tileType: 0 }); // Grow grass
-      break;
-    case 7: // Deep Water
-      updates.push({ x, y, tileType: 2 }); // Shallow out
-      break;
-    case 8: // Mountain
-      updates.push({ x, y, tileType: 4 }); // Turn to wall
-      // Spawn some rocks (walls) nearby
-      const n2 = neighbors[Math.floor(Math.random() * 8)];
-      updates.push({ x: x + n2.dx, y: y + n2.dy, tileType: 4 });
-      break;
-    default:
-      updates.push({ x, y, tileType: Math.floor(Math.random() * 9) });
-  }
-
-  // Filter out updates that would place a solid block on the player
-  const solidTiles = [1, 2, 4, 5, 7, 8];
-  const safeUpdates = updates.filter(u => {
-    const isPlayerPos = u.x === playerPos.x && u.y === playerPos.y;
-    const isSolid = solidTiles.includes(u.tileType);
-    return !(isPlayerPos && isSolid);
-  });
-
-  return { mapUpdates: safeUpdates };
-}
-
 export async function generateNPCResponse(npcName: string, npcType: string, playerMessage: string, localMapContext: string, apiKey: string): Promise<string> {
   const keyToUse = apiKey || process.env.GEMINI_API_KEY;
   if (!keyToUse) return "The traveler stares at you blankly.";
