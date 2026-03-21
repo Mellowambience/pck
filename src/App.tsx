@@ -9,6 +9,8 @@ import { auth, db } from './firebase';
 import { signInAnonymously, onAuthStateChanged, User, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { BattleScreen } from './components/BattleScreen';
+import { SpiritDex } from './components/SpiritDex';
+import { QuestLog } from './components/QuestLog';
 import { AnimatePresence } from 'motion/react';
 
 export default function App() {
@@ -30,6 +32,13 @@ export default function App() {
   const [demonsTamed, setDemonsTamed] = useState(0);
   const [apiKey, setApiKey] = useState(process.env.GEMINI_API_KEY || "");
   const [battleState, setBattleState] = useState<any>(null);
+  const [tamedSpirits, setTamedSpirits] = useState<{name:string,type:string,level:number}[]>([]);
+  const [inventory, setInventory] = useState<{[key:string]: number}>({ aetherOrb: 5, potion: 1, roses: 0 });
+  const [quests, setQuests] = useState<{id:string,title:string,progress:number,goal:number,completed:boolean}[]>([
+    { id: 'q1', title: 'Heal 3 Leylines', progress: 0, goal: 3, completed: false },
+    { id: 'q2', title: 'Tame 2 Spirits', progress: 0, goal: 2, completed: false },
+    { id: 'q3', title: 'Collect 10 Roses', progress: 0, goal: 10, completed: false }
+  ]);
   
   // Engine State
   const [minimapData, setMinimapData] = useState<number[]>([]);
@@ -164,15 +173,66 @@ export default function App() {
           entity.type = 'sheep';
           entity.name = "Tamed Spirit";
           setResonance(prev => Math.min(100, prev + 60));
+          setTamedSpirits(prev => {
+            const already = prev.some(s => s.name === entity.name && s.type === 'Aether-Kin');
+            if (already) return prev;
+            return [...prev, { name: 'Aether-Kin', type: 'Fairy', level: 1 }];
+          });
         } else {
           setChatHistory([{ role: 'npc', text: 'A spirit corrupted by Mars-shadows. It growls at you. Perhaps 5 Mystical Roses could soothe its pain?' }]);
         }
       } else {
         setChatHistory([{ role: 'npc', text: 'A gentle spirit you have tamed. It seems happy.' }]);
+        setTamedSpirits(prev => {
+          const already = prev.some(s => s.name === entity.name && s.type === entity.type);
+          if (already) return prev;
+          return [...prev, { name: entity.name, type: entity.type || 'Spirit', level: 1 }];
+        });
       }
     } else {
       setChatHistory([{ role: 'npc', text: 'Greetings, traveler. What brings you to these parts?' }]);
     }
+  };
+
+  const updateQuest = (questId: string, increment: number = 1) => {
+    setQuests(prev => prev.map(q => {
+      if (q.id !== questId || q.completed) return q;
+      const next = Math.min(q.goal, q.progress + increment);
+      return {
+        ...q,
+        progress: next,
+        completed: next >= q.goal
+      };
+    }));
+  };
+
+  const handleQuestEvents = (type: 'rose' | 'leyline' | 'tame') => {
+    if (type === 'rose') updateQuest('q3', 1);
+    if (type === 'leyline') updateQuest('q1', 1);
+    if (type === 'tame') updateQuest('q2', 1);
+  };
+
+  const handleBattleCatch = () => {
+    if (!battleState) return;
+
+    setTamedSpirits(prev => {
+      const existing = prev.some(s => s.name === battleState.name && s.type === battleState.type);
+      if (existing) return prev;
+      return [...prev, { name: battleState.name, type: battleState.type, level: battleState.level || 1 }];
+    });
+
+    setDemonsTamed(prev => prev + 1);
+    setResonance(prev => Math.min(100, prev + 25));
+    handleQuestEvents('tame');
+    setChatHistory(prev => [...prev, { role: 'system', text: `You captured ${battleState.name}! It joins your spirit pack.` }]);
+    setBattleState(null);
+    gameRef.current?.resumeGame();
+  };
+
+  const handleBattleFlee = () => {
+    setChatHistory(prev => [...prev, { role: 'system', text: `You slipped away from the encounter.` }]);
+    setBattleState(null);
+    gameRef.current?.resumeGame();
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -265,8 +325,16 @@ export default function App() {
         ref={gameRef} 
         onInteract={handleInteract} 
         onEntityInteract={handleEntityInteract} 
-        onRoseCollected={(count) => setRoseCount(count)}
-        onLeylineHealed={(count) => setLeylinesHealed(count)}
+        onRoseCollected={(count) => {
+          setRoseCount(count);
+          setInventory(prev => ({ ...prev, roses: (prev.roses || 0) + 1 }));
+          handleQuestEvents('rose');
+        }}
+        onLeylineHealed={(count) => {
+          setLeylinesHealed(count);
+          setInventory(prev => ({ ...prev, potion: (prev.potion || 0) + 1 }));
+          handleQuestEvents('leyline');
+        }}
         onEncounter={(creature) => setBattleState(creature)}
         apiKey={apiKey}
       />
@@ -276,14 +344,10 @@ export default function App() {
         {battleState && (
           <BattleScreen 
             wildCreature={battleState} 
-            onFlee={() => {
-              setBattleState(null);
-              gameRef.current?.resumeGame();
-            }}
-            onCatch={() => {
-              setBattleState(null);
-              gameRef.current?.resumeGame();
-            }}
+            onFlee={handleBattleFlee}
+            onCatch={handleBattleCatch}
+            aetherOrbs={inventory.aetherOrb || 0}
+            onUseAetherOrb={() => setInventory(prev => ({ ...prev, aetherOrb: Math.max(0, (prev.aetherOrb || 0) - 1) }))}
           />
         )}
       </AnimatePresence>
@@ -362,12 +426,19 @@ export default function App() {
         </div>
       )}
 
-      {/* Mission Log */}
+      {/* Mission Log + SpiritDex */}
       <div className="absolute top-6 right-6 flex flex-col gap-2 z-40 pointer-events-none">
+        <SpiritDex spirits={tamedSpirits} />
+        <QuestLog quests={quests} />
         <div className="bg-black/40 backdrop-blur-md border border-white/10 p-4 rounded-2xl w-64 shadow-xl pointer-events-auto">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-4 h-4 text-indigo-400" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-indigo-300">Mission: Save Earth</h3>
+          </div>
+          <div className="mb-2 bg-black/30 p-2 rounded-lg border border-white/10 text-[10px] text-neutral-300">
+            <div className="flex justify-between"><span>Aether Orbs</span><span>{inventory.aetherOrb}</span></div>
+            <div className="flex justify-between"><span>Potions</span><span>{inventory.potion}</span></div>
+            <div className="flex justify-between"><span>Roses</span><span>{inventory.roses}</span></div>
           </div>
           <div className="space-y-3">
             <div className="flex flex-col gap-1">
@@ -395,6 +466,21 @@ export default function App() {
               </div>
               <div className="h-1 bg-neutral-800 rounded-full overflow-hidden">
                 <div className="h-full bg-rose-500 transition-all" style={{ width: `${Math.min(100, (roseCount / 10) * 100)}%` }} />
+              </div>
+            </div>
+            <div className="mt-3 p-2 bg-black/30 border border-white/10 rounded-lg">
+              <div className="flex justify-between text-[10px] text-neutral-400 uppercase mb-1">
+                <span>Tamed Spirits</span>
+                <span>{tamedSpirits.length}/5</span>
+              </div>
+              <div className="text-[10px] text-neutral-300 h-16 overflow-y-auto space-y-1">
+                {tamedSpirits.length === 0 ? (
+                  <p>None yet. Catch spirits in tall grass.</p>
+                ) : (
+                  tamedSpirits.map((spirit, idx) => (
+                    <p key={idx} className="text-emerald-300">{spirit.name} ({spirit.type})</p>
+                  ))
+                )}
               </div>
             </div>
           </div>

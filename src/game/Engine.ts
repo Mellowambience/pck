@@ -34,6 +34,7 @@ export class GameEngine {
     direction: 'down',
     isMoving: false,
     speed: 128, // pixels per second
+    animPhase: 0,
     path: [] as {x: number, y: number}[]
   };
 
@@ -68,6 +69,8 @@ export class GameEngine {
     this.onEntityInteract = onEntityInteract;
     this.onEncounter = onEncounter;
     this.apiKey = apiKey || '';
+
+    this.loadBuiltInSprites();
     
     // Initialize fireflies
     for (let i = 0; i < 50; i++) {
@@ -83,6 +86,33 @@ export class GameEngine {
     window.addEventListener('keyup', this.handleKeyUp);
     
     this.loadSprites();
+  }
+
+  private generateSprite(color: string, accent?: string): string[] {
+    const sprite: string[] = Array(256).fill('');
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const idx = y * 16 + x;
+        if (x === 0 || x === 15 || y === 0 || y === 15) {
+          sprite[idx] = accent || color;
+        } else {
+          sprite[idx] = color;
+        }
+      }
+    }
+    return sprite;
+  }
+
+  private loadBuiltInSprites() {
+    this.sprites['player'] = this.generateSprite('#3b82f6', '#93c5fd');
+    this.sprites['rose'] = this.generateSprite('#e11d48', '#fb7185');
+    this.sprites['sheep'] = this.generateSprite('#f8fafc', '#cbd5e1');
+    this.sprites['shrine'] = this.generateSprite('#818cf8', '#60a5fa');
+    this.sprites['crystal'] = this.generateSprite('#a855f7', '#d8b4fe');
+    this.sprites['fire'] = this.generateSprite('#f97316', '#fb923c');
+    this.sprites['sign'] = this.generateSprite('#78350f', '#a16207');
+    this.sprites['leyline'] = this.generateSprite('#38bdf8', '#7dd3fc');
+    this.sprites['demon'] = this.generateSprite('#1e293b', '#f97316');
   }
 
   public async loadSprites() {
@@ -491,6 +521,10 @@ export class GameEngine {
       }
     }
 
+    // Player idle/animation phase
+    this.player.animPhase += deltaTime * 4;
+    if (this.player.animPhase > Math.PI * 2) this.player.animPhase -= Math.PI * 2;
+
     // Update entities
     for (const ent of this.entities) {
       if (!ent.isMoving && Math.random() < 0.02) {
@@ -657,12 +691,13 @@ export class GameEngine {
     renderables.sort((a, b) => a.pixelY - b.pixelY);
 
     for (const item of renderables) {
+      const bob = item.isPlayer ? Math.sin(this.player.animPhase) * 2 : 0;
       const px = item.pixelX;
-      const py = item.pixelY;
+      const py = item.pixelY - bob;
 
       // Shadow
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.beginPath(); ctx.ellipse(px + 16, py + 28, 10, 5, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(px + 16, py + 28 + bob, 10, 5, 0, 0, Math.PI*2); ctx.fill();
 
       if (item.isPlayer) {
         if (this.sprites['player']) {

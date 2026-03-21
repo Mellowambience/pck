@@ -15,6 +15,8 @@ interface BattleScreenProps {
   wildCreature: Creature;
   onFlee: () => void;
   onCatch: () => void;
+  aetherOrbs: number;
+  onUseAetherOrb: () => void;
 }
 
 export const BattleScreen: React.FC<BattleScreenProps> = ({ wildCreature, onFlee, onCatch }) => {
@@ -109,14 +111,27 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ wildCreature, onFlee
     }, 1500);
   };
 
+  const [showCatchEffect, setShowCatchEffect] = useState(false);
+
   const handleCatch = () => {
+    if (aetherOrbs <= 0) {
+      setMessage(`Out of Aether Orbs! Find more roses to craft.`);
+      return;
+    }
+
+    onUseAetherOrb();
     setShowActions(false);
     setMessage(`You threw an Aether Orb!`);
+
     setTimeout(() => {
       const catchRate = 1 - (wildHp / wildCreature.maxHp);
       if (Math.random() < catchRate + 0.2) {
         setMessage(`Gotcha! ${wildCreature.name} was caught!`);
-        setTimeout(onCatch, 2000);
+        setShowCatchEffect(true);
+        setTimeout(() => {
+          setShowCatchEffect(false);
+          onCatch();
+        }, 1800);
       } else {
         setMessage(`Oh no! The creature broke free!`);
         setTimeout(() => setShowActions(true), 1500);
@@ -245,8 +260,9 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ wildCreature, onFlee
               <button onClick={handleBoost} disabled={playerBp === 0 || boosting >= 3} className={`bg-slate-800 p-3 text-left font-bold tracking-widest transition-all border border-slate-600 ${playerBp > 0 && boosting < 3 ? 'hover:bg-amber-900/80 hover:border-amber-400 hover:pl-6' : 'opacity-50 cursor-not-allowed'}`}>
                 BOOST
               </button>
-              <button onClick={handleCatch} className="bg-slate-800 hover:bg-emerald-900/80 p-3 text-left font-bold tracking-widest transition-all border border-slate-600 hover:border-emerald-400 hover:pl-6">
+              <button onClick={handleCatch} disabled={aetherOrbs <= 0} className={`bg-slate-800 p-3 text-left font-bold tracking-widest transition-all border border-slate-600 ${aetherOrbs > 0 ? 'hover:bg-emerald-900/80 hover:border-emerald-400 hover:pl-6' : 'opacity-50 cursor-not-allowed'}`}>
                 CATCH
+                <span className="ml-1 text-xs text-slate-400">({aetherOrbs})</span>
               </button>
               <button onClick={onFlee} className="bg-slate-800 hover:bg-slate-700 p-3 text-left font-bold tracking-widest transition-all border border-slate-600 hover:pl-6">
                 FLEE
@@ -255,6 +271,14 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({ wildCreature, onFlee
           )}
         </motion.div>
       </div>
+
+      {showCatchEffect && (
+        <div className="absolute inset-0 z-[60] pointer-events-none flex items-center justify-center">
+          <div className="w-36 h-36 rounded-full border-2 border-cyan-300/80 animate-ping" />
+          <div className="w-24 h-24 rounded-full border-2 border-emerald-300/90 animate-pulse absolute" />
+          <div className="w-12 h-12 rounded-full bg-white/90 absolute" />
+        </div>
+      )}
     </motion.div>
   );
 };
