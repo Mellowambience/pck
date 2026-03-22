@@ -13,6 +13,15 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  
+  // Add CSP headers
+  app.use((req, res, next) => {
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://apis.google.com https://ai.google.dev; connect-src 'self' wss: https: http: ws:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
+    );
+    next();
+  });
 
   // API Routes
   app.get("/api/health", (req, res) => {

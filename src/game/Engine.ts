@@ -104,30 +104,203 @@ export class GameEngine {
   }
 
   private loadBuiltInSprites() {
-    this.sprites['player'] = this.generateSprite('#3b82f6', '#93c5fd');
-    this.sprites['rose'] = this.generateSprite('#e11d48', '#fb7185');
-    this.sprites['sheep'] = this.generateSprite('#f8fafc', '#cbd5e1');
-    this.sprites['shrine'] = this.generateSprite('#818cf8', '#60a5fa');
-    this.sprites['crystal'] = this.generateSprite('#a855f7', '#d8b4fe');
-    this.sprites['fire'] = this.generateSprite('#f97316', '#fb923c');
-    this.sprites['sign'] = this.generateSprite('#78350f', '#a16207');
-    this.sprites['leyline'] = this.generateSprite('#38bdf8', '#7dd3fc');
-    this.sprites['demon'] = this.generateSprite('#1e293b', '#f97316');
+    // Pokémon Crystal/Yellow style pixel art sprites (16x16)
+    // Using Game Boy Color inspired palette
+    
+    // Player sprite - young trainer in red/blue outfit (Pokémon Crystal style)
+    this.sprites['player'] = [
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","#8B4513","#8B4513","#8B4513","","","","","","","",
+      "","","","","","","#8B4513","#FFDBAC","#8B4513","","","","","","","",
+      "","","","","","","#8B4513","#FFDBAC","#8B4513","","","","","","","",
+      "","","","","","","#DC143C","#DC143C","#DC143C","","","","","","","",
+      "","","","","","","#DC143C","#FFDBAC","#DC143C","","","","","","","",
+      "","","","","","","#DC143C","#FFDBAC","#DC143C","","","","","","","",
+      "","","","","","","#4169E1","#4169E1","#4169E1","","","","","","","",
+      "","","","","","","#4169E1","#FFDBAC","#4169E1","","","","","","","",
+      "","","","","","","#4169E1","#FFDBAC","#4169E1","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","",""
+    ];
+
+    // Rose - mystical glowing flower (Pokémon Crystal style)
+    this.sprites['rose'] = [
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","#FFD700","","","","","","","",
+      "","","","","","","","#DC143C","#DC143C","#DC143C","","","","","","",
+      "","","","","","","","#DC143C","#228B22","#DC143C","","","","","","",
+      "","","","","","","","","#228B22","","","","","","","",
+      "","","","","","","","","#228B22","","","","","","","",
+      "","","","","","","","","#228B22","","","","","","","",
+      "","","","","","","","","#228B22","","","","","","","",
+      "","","","","","","","","#228B22","","","","","","","",
+      "","","","","","","","","#228B22","","","","","","",""
+    ];
+
+    // Sheep - fluffy white creature (Pokémon Crystal style)
+    this.sprites['sheep'] = [
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","#FFFFFF","#FFFFFF","","","","","","",
+      "","","","","","","","","#FFFFFF","#000000","#FFFFFF","","","","","",
+      "","","","","","","","#FFFFFF","#FFFFFF","#FFFFFF","#FFFFFF","","","","",
+      "","","","","","","","#FFFFFF","#FFFFFF","#FFFFFF","#FFFFFF","","","","",
+      "","","","","","","","","#FFFFFF","","","","","","","",
+      "","","","","","","","","#FFFFFF","","","","","","","",
+      "","","","","","","","","#FFFFFF","","","","","","","",
+      "","","","","","","","","#FFFFFF","","","","","","",""
+    ];
+
+    // Shrine - ancient stone structure (Pokémon Crystal style)
+    this.sprites['shrine'] = [
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","#708090","#708090","","","","","","",
+      "","","","","","","","","#708090","#708090","","","","","","",
+      "","","","","","","","","#00FFFF","#00FFFF","","","","","","",
+      "","","","","","","","","#00FFFF","#00FFFF","","","","","","",
+      "","","","","","","","#708090","#708090","#708090","#708090","","","","",
+      "","","","","","","","#708090","#708090","#708090","#708090","","","","",
+      "","","","","","","","#708090","#708090","#708090","#708090","","","","",
+      "","","","","","","","#708090","#708090","#708090","#708090","","","",""
+    ];
+
+    // Crystal - glowing purple gem (Pokémon Crystal style)
+    this.sprites['crystal'] = [
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","#DDA0DD","","","","","","","",
+      "","","","","","","","","#BA55D3","#BA55D3","","","","","","",
+      "","","","","","","","","#9932CC","#9932CC","","","","","","",
+      "","","","","","","","#BA55D3","#663399","#BA55D3","","","","","",
+      "","","","","","","","#9932CC","#663399","#9932CC","","","","","",
+      "","","","","","","","","","","","","","","",""
+    ];
+
+    // Fire - corrupted flame (Pokémon Crystal style)
+    this.sprites['fire'] = [
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","#DC143C","","","","","","","",
+      "","","","","","","","","#DC143C","#000000","","","","","","",
+      "","","","","","","","","#DC143C","#DC143C","","","","","","",
+      "","","","","","","","","#000000","#DC143C","","","","","","",
+      "","","","","","","","","#DC143C","#000000","","","","","","",
+      "","","","","","","","","#DC143C","#DC143C","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","",""
+    ];
+
+    // Sign - wooden signpost (Pokémon Crystal style)
+    this.sprites['sign'] = [
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","#8B4513","#8B4513","","","","","","",
+      "","","","","","","","","#8B4513","#8B4513","","","","","","",
+      "","","","","","","","","#8B4513","#8B4513","","","","","","",
+      "","","","","","","","","#8B4513","#8B4513","","","","","","",
+      "","","","","","","","#8B4513","#FFFFFF","#8B4513","","","","","",
+      "","","","","","","","#8B4513","#FFFFFF","#8B4513","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","",""
+    ];
+
+    // Leyline - magical energy node
+    this.sprites['leyline'] = [
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","#4169E1","","","","","","","",
+      "","","","","","","","","#4169E1","#00BFFF","","","","","","",
+      "","","","","","","","","#00BFFF","#4169E1","","","","","","",
+      "","","","","","","","","#4169E1","#00BFFF","","","","","","",
+      "","","","","","","","","#00BFFF","#4169E1","","","","","","",
+      "","","","","","","","","#4169E1","#00BFFF","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","",""
+    ];
+
+    // Demon - corrupted spirit
+    this.sprites['demon'] = [
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","#DC143C","#DC143C","","","","","","",
+      "","","","","","","","","#DC143C","#DC143C","","","","","","",
+      "","","","","","","","","#000000","#000000","","","","","","",
+      "","","","","","","","","#000000","#000000","","","","","","",
+      "","","","","","","","#000000","#000000","#000000","#000000","","","","",
+      "","","","","","","","#000000","#000000","#000000","#000000","","","","",
+      "","","","","","","","","","","","","","","","",
+      "","","","","","","","","","","","","","","",""
+    ];
   }
 
   public async loadSprites() {
     if (!this.apiKey) return;
     
     const entitiesToGenerate = [
-      { id: 'player', prompt: 'A tiny 16x16 pixel art RPG hero character, top-down view.' },
-      { id: 'rose', prompt: 'A glowing mystical red rose, 16x16 pixel art.' },
-      { id: 'sheep', prompt: 'A fluffy white sheep, 16x16 pixel art, top-down view.' },
-      { id: 'shrine', prompt: 'An ancient stone shrine with glowing runes, 16x16 pixel art.' },
-      { id: 'crystal', prompt: 'A glowing purple aether crystal, 16x16 pixel art.' },
-      { id: 'fire', prompt: 'A corrupted red and black mars-flame, 16x16 pixel art.' },
-      { id: 'sign', prompt: 'A small wooden signpost, 16x16 pixel art.' },
-      { id: 'leyline', prompt: 'A glowing blue magical leyline node on the ground, 16x16 pixel art.' },
-      { id: 'demon', prompt: 'A dark, shadowy corrupted spirit with red eyes, 16x16 pixel art.' }
+      { id: 'player', prompt: 'A young Pokémon trainer character in red and blue clothes, top-down view, 16x16 pixel art in the style of Pokémon Crystal/Red & Blue games, clean pixel art with limited colors.' },
+      { id: 'rose', prompt: 'A mystical glowing red rose flower, 16x16 pixel art in the style of Pokémon Crystal games, with a retro Game Boy Color aesthetic.' },
+      { id: 'sheep', prompt: 'A fluffy white sheep, top-down view, 16x16 pixel art in the style of Pokémon Crystal games, simple and cute.' },
+      { id: 'shrine', prompt: 'An ancient stone shrine with glowing magical runes, 16x16 pixel art in the style of Pokémon Crystal games.' },
+      { id: 'crystal', prompt: 'A glowing purple mystical crystal, 16x16 pixel art in the style of Pokémon Crystal games, with facets and light reflections.' },
+      { id: 'fire', prompt: 'A corrupted red and black magical flame, 16x16 pixel art in the style of Pokémon Crystal games, ominous and flickering.' },
+      { id: 'sign', prompt: 'A small wooden signpost, 16x16 pixel art in the style of Pokémon Crystal games, simple and readable.' },
+      { id: 'leyline', prompt: 'A glowing blue magical energy node on the ground, 16x16 pixel art in the style of Pokémon Crystal games.' },
+      { id: 'demon', prompt: 'A dark shadowy corrupted spirit with red glowing eyes, 16x16 pixel art in the style of Pokémon Crystal games.' }
     ];
 
     for (const entity of entitiesToGenerate) {
@@ -505,7 +678,7 @@ export class GameEngine {
           
           const currentTile = this.getTile(this.player.gridX, this.player.gridY);
           if (currentTile === TILE_TALL_GRASS) {
-            if (Math.random() < 0.15) {
+            if (Math.random() < 0.05) { // Reduced from 15% to 5% chance
               this.triggerEncounter();
             }
           }
@@ -564,38 +737,58 @@ export class GameEngine {
   }
 
   private drawSprite(px: number, py: number, pixels: string[]) {
-    if (!pixels || pixels.length !== 256) return false;
+    // Fallback if no pixels
+    if (!pixels || pixels.length === 0) {
+      console.warn('drawSprite: no pixels array', { px, py, length: pixels?.length });
+      this.ctx.fillStyle = '#FF0000';
+      this.ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+      return false;
+    }
     
+    // Draw sprite pixels
+    let pixelsDrawn = 0;
     for (let i = 0; i < 256; i++) {
       const color = pixels[i];
       if (color && color !== "") {
         const x = i % 16;
         const y = Math.floor(i / 16);
         this.ctx.fillStyle = color;
-        this.ctx.fillRect(px + x * 2, py + y * 2, 2, 2);
+        this.ctx.fillRect(px + x * 6, py + y * 6, 6, 6);
+        pixelsDrawn++;
       }
     }
+    
+    // If nothing was drawn, show a placeholder
+    if (pixelsDrawn === 0) {
+      console.warn('drawSprite: no pixels drawn, showing yellow placeholder', { px, py });
+      this.ctx.fillStyle = '#FFFF00';
+      this.ctx.fillRect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+    } else {
+      console.log('drawSprite: drew', pixelsDrawn, 'pixels at', px, py);
+    }
+    
     return true;
   }
 
   private draw() {
     const { ctx, canvas } = this;
-    ctx.fillStyle = '#0f172a'; // Darker background
+
+    ctx.fillStyle = '#87ceeb'; // Sky blue background (like Pokémon games)
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const cameraX = Math.floor(canvas.width / 2 - this.player.pixelX * this.zoom - (TILE_SIZE * this.zoom / 2));
     const cameraY = Math.floor(canvas.height / 2 - this.player.pixelY * this.zoom - (TILE_SIZE * this.zoom / 2));
 
-    // Parallax Background
+    // Parallax Background (subtle clouds)
     ctx.save();
-    const parallaxX = cameraX * 0.2;
-    const parallaxY = cameraY * 0.2;
-    ctx.translate(parallaxX % 100, parallaxY % 100);
+    const parallaxX = cameraX * 0.1;
+    const parallaxY = cameraY * 0.1;
+    ctx.translate(parallaxX % 200, parallaxY % 200);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-    for (let i = -100; i < canvas.width + 100; i += 50) {
-      for (let j = -100; j < canvas.height + 100; j += 50) {
+    for (let i = -200; i < canvas.width + 200; i += 100) {
+      for (let j = -200; j < canvas.height + 200; j += 100) {
         ctx.beginPath();
-        ctx.arc(i, j, 1, 0, Math.PI * 2);
+        ctx.arc(i, j, 2, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -622,20 +815,20 @@ export class GameEngine {
         const px = x * TILE_SIZE;
         const py = y * TILE_SIZE;
         
-        // Base tile colors
-        if (tile === TILE_GRASS) ctx.fillStyle = '#4ade80'; // Grass
-        else if (tile === TILE_TREE) ctx.fillStyle = '#4ade80'; // Tree base (grass)
-        else if (tile === TILE_WATER) ctx.fillStyle = '#3b82f6'; // Water
-        else if (tile === TILE_PATH) ctx.fillStyle = '#d6d3d1'; // Path
-        else if (tile === TILE_TALL_GRASS) ctx.fillStyle = '#22c55e'; // Tall Grass
+        // Base tile colors (Pokémon Crystal/Yellow inspired palette)
+        if (tile === TILE_GRASS) ctx.fillStyle = '#9bbc0f'; // Light green grass
+        else if (tile === TILE_TREE) ctx.fillStyle = '#9bbc0f'; // Tree base (grass)
+        else if (tile === TILE_WATER) ctx.fillStyle = '#306230'; // Dark green-blue water
+        else if (tile === TILE_PATH) ctx.fillStyle = '#c6b27d'; // Sandy path
+        else if (tile === TILE_TALL_GRASS) ctx.fillStyle = '#4a90e2'; // Blue-tinted tall grass
         else ctx.fillStyle = '#000';
 
         ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
         // Details
         if (tile === TILE_GRASS || tile === TILE_TREE || tile === TILE_TALL_GRASS) {
-          // Grass blades
-          ctx.fillStyle = tile === TILE_TALL_GRASS ? '#16a34a' : '#22c55e';
+          // Grass blades (Pokémon Crystal style)
+          ctx.fillStyle = tile === TILE_TALL_GRASS ? '#8bb956' : '#9bbc0f';
           for(let i=0; i<4; i++) {
             let rx = pseudoRandom(x, y+i) * (TILE_SIZE - 2);
             let ry = pseudoRandom(x+i, y) * (TILE_SIZE - 4);
@@ -644,25 +837,25 @@ export class GameEngine {
         }
 
         if (tile === TILE_WATER) {
-          // Water waves
-          ctx.fillStyle = 'rgba(255,255,255,0.2)';
-          let waveOffset = Math.sin(this.globalTime * 2 + x * 0.5 + y * 0.5) * 4;
-          ctx.fillRect(px + 4 + waveOffset, py + 8, 12, 2);
-          ctx.fillRect(px + 16 - waveOffset, py + 20, 10, 2);
+          // Water waves (simplified for retro style)
+          ctx.fillStyle = 'rgba(255,255,255,0.3)';
+          let waveOffset = Math.sin(this.globalTime * 2 + x * 0.5 + y * 0.5) * 2;
+          ctx.fillRect(px + 4 + waveOffset, py + 8, 8, 1);
+          ctx.fillRect(px + 16 - waveOffset, py + 20, 6, 1);
         }
 
         if (tile === TILE_TREE) {
-          // Tree shadow
-          ctx.fillStyle = 'rgba(0,0,0,0.3)';
-          ctx.beginPath(); ctx.ellipse(px + 16, py + 28, 12, 6, 0, 0, Math.PI*2); ctx.fill();
-          // Trunk
-          ctx.fillStyle = '#78350f';
+          // Tree shadow (subtle)
+          ctx.fillStyle = 'rgba(0,0,0,0.2)';
+          ctx.beginPath(); ctx.ellipse(px + 16, py + 28, 10, 4, 0, 0, Math.PI*2); ctx.fill();
+          // Trunk (brown)
+          ctx.fillStyle = '#8b4513';
           ctx.fillRect(px + 12, py + 16, 8, 14);
-          // Leaves (Pine)
-          ctx.fillStyle = '#166534';
-          ctx.beginPath(); ctx.moveTo(px + 16, py - 4); ctx.lineTo(px + 28, py + 20); ctx.lineTo(px + 4, py + 20); ctx.fill();
-          ctx.fillStyle = '#14532d'; // darker shade for depth
-          ctx.beginPath(); ctx.moveTo(px + 16, py - 4); ctx.lineTo(px + 28, py + 20); ctx.lineTo(px + 16, py + 20); ctx.fill();
+          // Leaves (green, more pixelated)
+          ctx.fillStyle = '#306230';
+          ctx.fillRect(px + 4, py + 4, 24, 16);
+          ctx.fillStyle = '#4a90e2'; // lighter green for highlights
+          ctx.fillRect(px + 8, py + 6, 16, 10);
         } 
 
         // Draw hover highlight
@@ -689,6 +882,8 @@ export class GameEngine {
     ];
 
     renderables.sort((a, b) => a.pixelY - b.pixelY);
+    
+    console.log('Drawing', renderables.length, 'renderables, sprites count:', Object.keys(this.sprites).length);
 
     for (const item of renderables) {
       const bob = item.isPlayer ? Math.sin(this.player.animPhase) * 2 : 0;
@@ -700,155 +895,10 @@ export class GameEngine {
       ctx.beginPath(); ctx.ellipse(px + 16, py + 28 + bob, 10, 5, 0, 0, Math.PI*2); ctx.fill();
 
       if (item.isPlayer) {
-        if (this.sprites['player']) {
-          this.drawSprite(px, py, this.sprites['player']);
-        } else {
-          // Player Body (Jacket/Shirt)
-          ctx.fillStyle = '#3b82f6'; // Blue jacket
-          ctx.fillRect(px + 10, py + 14, 12, 10);
-          
-          // Arms
-          ctx.fillStyle = '#2563eb'; // Darker blue sleeves
-          ctx.fillRect(px + 8, py + 14, 4, 8);
-          ctx.fillRect(px + 20, py + 14, 4, 8);
-
-          // Hands
-          ctx.fillStyle = '#fcd34d'; // Skin
-          ctx.fillRect(px + 8, py + 22, 4, 3);
-          ctx.fillRect(px + 20, py + 22, 4, 3);
-
-          // Pants
-          ctx.fillStyle = '#1e293b'; // Dark pants
-          ctx.fillRect(px + 10, py + 24, 12, 6);
-
-          // Shoes
-          ctx.fillStyle = '#ef4444'; // Red shoes
-          ctx.fillRect(px + 9, py + 28, 6, 4);
-          ctx.fillRect(px + 17, py + 28, 6, 4);
-          
-          // Head
-          ctx.fillStyle = '#fcd34d'; // Skin
-          ctx.beginPath(); ctx.arc(px + 16, py + 10, 7, 0, Math.PI*2); ctx.fill();
-          
-          // Hat
-          ctx.fillStyle = '#ef4444'; // Red hat
-          ctx.beginPath(); ctx.arc(px + 16, py + 8, 7, Math.PI, 0); ctx.fill();
-          // Hat brim
-          if (this.player.direction === 'down') {
-            ctx.fillRect(px + 9, py + 7, 14, 2);
-          } else if (this.player.direction === 'left') {
-            ctx.fillRect(px + 7, py + 7, 8, 2);
-          } else if (this.player.direction === 'right') {
-            ctx.fillRect(px + 17, py + 7, 8, 2);
-          } else if (this.player.direction === 'up') {
-            // Brim in back, mostly hidden
-          }
-
-          // Direction indicator (eyes/face)
-          ctx.fillStyle = '#1e1b4b';
-          if (this.player.direction === 'down') {
-            ctx.fillRect(px + 13, py + 10, 2, 2);
-            ctx.fillRect(px + 17, py + 10, 2, 2);
-          } else if (this.player.direction === 'left') {
-            ctx.fillRect(px + 11, py + 10, 2, 2);
-          } else if (this.player.direction === 'right') {
-            ctx.fillRect(px + 19, py + 10, 2, 2);
-          }
-        }
+        this.drawSprite(px, py, this.sprites['player']);
       } else {
         const ent = item as any;
-        if (this.sprites[ent.type]) {
-          this.drawSprite(px, py, this.sprites[ent.type]);
-        } else if (ent.type === 'sheep') {
-          // Body
-          ctx.fillStyle = '#f8fafc';
-          ctx.beginPath(); ctx.ellipse(px + 16, py + 20, 12, 8, 0, 0, Math.PI*2); ctx.fill();
-          // Head
-          ctx.fillStyle = '#0f172a';
-          ctx.fillRect(px + 22, py + 14, 6, 6);
-          // Legs
-          ctx.fillStyle = '#0f172a';
-          ctx.fillRect(px + 10, py + 26, 2, 4);
-          ctx.fillRect(px + 20, py + 26, 2, 4);
-        } else if (ent.type === 'traveler') {
-          // Body (Jacket/Shirt)
-          ctx.fillStyle = '#10b981'; // Green jacket
-          ctx.fillRect(px + 10, py + 14, 12, 10);
-          
-          // Arms
-          ctx.fillStyle = '#059669'; // Darker green sleeves
-          ctx.fillRect(px + 8, py + 14, 4, 8);
-          ctx.fillRect(px + 20, py + 14, 4, 8);
-
-          // Hands
-          ctx.fillStyle = '#fcd34d'; // Skin
-          ctx.fillRect(px + 8, py + 22, 4, 3);
-          ctx.fillRect(px + 20, py + 22, 4, 3);
-
-          // Pants
-          ctx.fillStyle = '#1e293b'; // Dark pants
-          ctx.fillRect(px + 10, py + 24, 12, 6);
-
-          // Shoes
-          ctx.fillStyle = '#f59e0b'; // Orange shoes
-          ctx.fillRect(px + 9, py + 28, 6, 4);
-          ctx.fillRect(px + 17, py + 28, 6, 4);
-          
-          // Head
-          ctx.fillStyle = '#fcd34d'; // Skin
-          ctx.beginPath(); ctx.arc(px + 16, py + 10, 7, 0, Math.PI*2); ctx.fill();
-          
-          // Hair
-          ctx.fillStyle = '#78350f'; // Brown hair
-          ctx.beginPath(); ctx.arc(px + 16, py + 8, 7, Math.PI, 0); ctx.fill();
-          ctx.fillRect(px + 9, py + 7, 14, 3);
-        } else if (ent.type === 'rose') {
-          ctx.fillStyle = '#e11d48';
-          ctx.beginPath(); ctx.arc(px + 16, py + 16, 4, 0, Math.PI*2); ctx.fill();
-          ctx.fillStyle = '#16a34a';
-          ctx.fillRect(px + 15, py + 20, 2, 8);
-        } else if (ent.type === 'shrine') {
-          ctx.fillStyle = '#475569';
-          ctx.fillRect(px + 4, py + 4, 24, 24);
-          ctx.fillStyle = '#818cf8';
-          ctx.beginPath(); ctx.arc(px + 16, py + 16, 6, 0, Math.PI*2); ctx.fill();
-        } else if (ent.type === 'crystal') {
-          ctx.fillStyle = '#a855f7';
-          ctx.beginPath(); ctx.moveTo(px + 16, py + 4); ctx.lineTo(px + 24, py + 24); ctx.lineTo(px + 8, py + 24); ctx.fill();
-          
-          // Crystal particles
-          const t = this.globalTime * 2;
-          ctx.fillStyle = 'rgba(216, 180, 254, 0.6)';
-          for (let i = 0; i < 3; i++) {
-            const offset = (t + i * 2) % 4;
-            ctx.fillRect(px + 12 + Math.sin(t + i)*8, py + 20 - offset*4, 2, 2);
-          }
-        } else if (ent.type === 'fire') {
-          ctx.fillStyle = '#f97316';
-          ctx.beginPath(); ctx.moveTo(px + 16, py + 8); ctx.lineTo(px + 24, py + 28); ctx.lineTo(px + 8, py + 28); ctx.fill();
-          
-          // Fire particles
-          const t = this.globalTime * 5;
-          ctx.fillStyle = 'rgba(253, 186, 116, 0.8)';
-          for (let i = 0; i < 4; i++) {
-            const offset = (t + i * 1.5) % 5;
-            ctx.fillRect(px + 14 + Math.sin(t + i)*4, py + 24 - offset*3, 3, 3);
-          }
-        } else if (ent.type === 'sign') {
-          ctx.fillStyle = '#78350f';
-          ctx.fillRect(px + 14, py + 16, 4, 14);
-          ctx.fillRect(px + 6, py + 8, 20, 10);
-        } else if (ent.type === 'leyline') {
-          const alpha = (Math.sin(this.globalTime * 2) + 1) / 2;
-          ctx.fillStyle = ent.isCorrupted ? `rgba(249, 115, 22, ${alpha * 0.5})` : `rgba(56, 189, 248, ${alpha * 0.8})`;
-          ctx.beginPath(); ctx.arc(px + 16, py + 16, 12, 0, Math.PI * 2); ctx.fill();
-        } else if (ent.type === 'demon') {
-          ctx.fillStyle = '#1e293b';
-          ctx.beginPath(); ctx.arc(px + 16, py + 16, 10, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#f97316';
-          ctx.fillRect(px + 12, py + 12, 2, 2);
-          ctx.fillRect(px + 18, py + 12, 2, 2);
-        }
+        this.drawSprite(px, py, this.sprites[ent.type]);
       }
     }
 
@@ -868,15 +918,15 @@ export class GameEngine {
           const brightness = (Math.sin(this.globalTime * 3 + ff.phase) + 1) / 2; // 0 to 1
           const alpha = brightness * (darkness / 0.7); // Scale by darkness
           
-          ctx.fillStyle = `rgba(167, 243, 208, ${alpha})`; // Emerald-200
+          ctx.fillStyle = `rgba(255, 255, 0, ${alpha * 0.8})`; // Yellow fireflies
           ctx.beginPath();
-          ctx.arc(ff.x, ff.y, 1.5 / this.zoom, 0, Math.PI * 2);
+          ctx.arc(ff.x, ff.y, 1 / this.zoom, 0, Math.PI * 2);
           ctx.fill();
           
-          // Glow
-          const glow = ctx.createRadialGradient(ff.x, ff.y, 0, ff.x, ff.y, 8 / this.zoom);
-          glow.addColorStop(0, `rgba(167, 243, 208, ${alpha * 0.5})`);
-          glow.addColorStop(1, 'rgba(167, 243, 208, 0)');
+          // Glow (subtle)
+          const glow = ctx.createRadialGradient(ff.x, ff.y, 0, ff.x, ff.y, 4 / this.zoom);
+          glow.addColorStop(0, `rgba(255, 255, 0, ${alpha * 0.3})`);
+          glow.addColorStop(1, 'rgba(255, 255, 0, 0)');
           ctx.fillStyle = glow;
           ctx.beginPath();
           ctx.arc(ff.x, ff.y, 8 / this.zoom, 0, Math.PI * 2);
@@ -948,6 +998,10 @@ export class GameEngine {
     gradient.addColorStop(1, 'rgba(0,0,0,0.7)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // DEBUG: Draw visible marker at end to verify canvas rendering
+    ctx.fillStyle = '#00FF00';
+    ctx.fillRect(canvas.width - 60, canvas.height - 60, 50, 50);
   }
 
   public getMinimapData(radius: number) {
