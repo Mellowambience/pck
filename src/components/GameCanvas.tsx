@@ -7,6 +7,7 @@ interface Props {
   onRoseCollected?: (count: number) => void;
   onLeylineHealed?: (count: number) => void;
   onEncounter?: (creature: any) => void;
+  onBiomeChange?: (biome: string) => void;
   apiKey?: string;
 }
 
@@ -20,7 +21,7 @@ export interface GameCanvasRef {
   resumeGame: () => void;
 }
 
-export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEntityInteract, onRoseCollected, onLeylineHealed, onEncounter, apiKey }, ref) => {
+export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEntityInteract, onRoseCollected, onLeylineHealed, onEncounter, onBiomeChange, apiKey }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const onInteractRef = useRef(onInteract);
@@ -28,6 +29,7 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
   const onRoseCollectedRef = useRef(onRoseCollected);
   const onLeylineHealedRef = useRef(onLeylineHealed);
   const onEncounterRef = useRef(onEncounter);
+  const onBiomeChangeRef = useRef(onBiomeChange);
 
   useEffect(() => {
     onInteractRef.current = onInteract;
@@ -47,7 +49,8 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
 
   useEffect(() => {
     onEncounterRef.current = onEncounter;
-  }, [onEncounter]);
+    onBiomeChangeRef.current = onBiomeChange;
+  }, [onEncounter, onBiomeChange]);
 
   useEffect(() => {
     if (engineRef.current && apiKey) {
@@ -74,7 +77,8 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
       (x, y, t) => onInteractRef.current(x, y, t),
       (entity) => onEntityInteractRef.current(entity),
       (creature) => onEncounterRef.current?.(creature),
-      apiKey
+      apiKey,
+      (biome) => onBiomeChangeRef.current?.(biome)
     );
     engine.onRoseCollected = (count) => onRoseCollectedRef.current?.(count);
     engine.onLeylineHealed = (count) => onLeylineHealedRef.current?.(count);

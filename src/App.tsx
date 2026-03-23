@@ -24,6 +24,7 @@ export default function App() {
   const [playerXp, setPlayerXp] = useState(0);
   const [playerHpMax, setPlayerHpMax] = useState(60);
   const [pendingEvo, setPendingEvo] = useState<{ spiritId: string; chain: EvolutionChain } | null>(null);
+  const [currentBiome, setCurrentBiome] = useState('grass');
   const [spiritBonds, setSpiritBonds] = useState<Record<string, number>>({});
   
   // Auth & Persistence State
@@ -43,6 +44,7 @@ export default function App() {
   const [battleState, setBattleState] = useState<any>(null);
   const [tamedSpirits, setTamedSpirits] = useState<StoredSpirit[]>([]);
   const [showSpiritBox, setShowSpiritBox] = useState(false);
+  const [showDex, setShowDex] = useState(false);
   const [inventory, setInventory] = useState<{[key:string]: number}>({ aetherOrb: 5, potion: 1, roses: 0 });
   const [quests, setQuests] = useState<{id:string,title:string,progress:number,goal:number,completed:boolean}[]>([
     { id: 'q1', title: 'Heal 3 Leylines', progress: 0, goal: 3, completed: false },
@@ -238,7 +240,7 @@ export default function App() {
   const checkSpiritEvolutions = (updatedSpirits: typeof tamedSpirits) => {
     for (const s of updatedSpirits) {
       const bond = spiritBonds[s.id] || 0;
-      const biome = 'grass'; // TODO: pass real biome from engine
+      const biome = currentBiome;
       const chain = checkEvolution(s.name, s.level, bond, biome);
       if (chain) {
         setPendingEvo({ spiritId: s.id, chain });
@@ -400,6 +402,7 @@ export default function App() {
           handleQuestEvents('leyline');
         }}
         onEncounter={(creature) => setBattleState(creature)}
+        onBiomeChange={(b) => setCurrentBiome(b)}
         apiKey={apiKey}
       />
 
@@ -415,6 +418,7 @@ export default function App() {
             playerLevel={playerLevel}
             playerHpMax={playerHpMax}
             onXpGain={handleXpGain}
+            partySpirits={tamedSpirits.filter(s => s.inParty)}
           />
         )}
       </AnimatePresence>
@@ -519,6 +523,21 @@ export default function App() {
         })()}
       </AnimatePresence>
 
+      {/* SpiritDex Modal */}
+      {showDex && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="relative bg-neutral-900 border border-purple-500/30 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-purple-300">📖 SpiritDex</h2>
+              <button onClick={() => setShowDex(false)} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              <SpiritDex spirits={tamedSpirits.map(s => ({ name: s.name, type: s.type, level: s.level, caught: true }))} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Spirit Box Modal */}
       {showSpiritBox && (
         <SpiritBox
@@ -553,6 +572,18 @@ export default function App() {
               ))}
             </div>
           )}
+        </button>
+        <button
+          onClick={() => setShowDex(true)}
+          className="bg-black/40 backdrop-blur-md border border-white/10 p-3 rounded-2xl w-64 shadow-xl pointer-events-auto hover:border-purple-500/40 transition-all group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📖</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-purple-300 group-hover:text-purple-200">SpiritDex</span>
+            </div>
+            <span className="text-xs font-mono text-slate-400">{[...new Set(tamedSpirits.map(s => s.name))].length} seen</span>
+          </div>
         </button>
         <QuestLog quests={quests} />
         <div className="bg-black/40 backdrop-blur-md border border-white/10 p-4 rounded-2xl w-64 shadow-xl pointer-events-auto">

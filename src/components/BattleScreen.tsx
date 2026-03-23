@@ -7,6 +7,16 @@ interface Creature {
   color: string; level: number; shield?: number;
 }
 
+interface PartySpirit {
+  id: string;
+  name: string;
+  type: string;
+  level: number;
+  hp: number;
+  maxHp: number;
+  moves: string[];
+}
+
 interface BattleScreenProps {
   wildCreature: Creature;
   onFlee: () => void;
@@ -16,6 +26,7 @@ interface BattleScreenProps {
   playerLevel?: number;
   playerHpMax?: number;
   onXpGain?: (xp: number) => void;
+  partySpirits?: PartySpirit[];
 }
 
 const typeChart: Record<string, Record<string, number>> = {
@@ -66,7 +77,7 @@ const CREATURE_EMOJI: Record<string, string> = {
 
 export const BattleScreen: React.FC<BattleScreenProps> = ({
   wildCreature, onFlee, onCatch, aetherOrbs, onUseAetherOrb,
-  playerLevel = 1, playerHpMax = 100, onXpGain,
+  playerLevel = 1, playerHpMax = 100, onXpGain, partySpirits = [],
 }) => {
   const [playerHp, setPlayerHp] = useState(playerHpMax);
   const [wildHp, setWildHp] = useState(wildCreature.hp);
@@ -77,7 +88,10 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({
   const [atkBoost, setAtkBoost] = useState(0);
   const [playerStatus, setPlayerStatus] = useState<StatusEffect | null>(null);
   const [wildStatus, setWildStatus] = useState<StatusEffect | null>(null);
-  const [playerMoves] = useState<Move[]>(() => PLAYER_MOVES.map(buildMove));
+  const [playerMoves] = useState<Move[]>(() => {
+    const names = activeSpirit?.moves?.length ? activeSpirit.moves : PLAYER_MOVES;
+    return names.map(n => { try { return buildMove(n); } catch { return buildMove('AetherPulse'); } });
+  });
   const [wildMoves, setWildMoves] = useState<Move[]>(() => getCreatureMoves(wildCreature.name));
   const [phase, setPhase] = useState<'intro' | 'choose' | 'animate' | 'enemy' | 'catch' | 'end'>('intro');
   const [message, setMessage] = useState(`A wild ${wildCreature.name} appeared!`);
@@ -88,6 +102,12 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({
   const [flashPlayer, setFlashPlayer] = useState(false);
   const [showMoves, setShowMoves] = useState(false);
 
+  // Active spirit — first in-party spirit, or null (player fights bare-handed)
+  const activeSpirit = partySpirits[0] ?? null;
+  const playerLabel = activeSpirit ? activeSpirit.name : 'You';
+  const activeMoveNames: string[] = activeSpirit?.moves?.length
+    ? activeSpirit.moves
+    : PLAYER_MOVES;
   const typeColor = TYPE_COLORS[wildCreature.type] || '#94a3b8';
   const hpPct = (wildHp / wildCreature.maxHp) * 100;
   const playerHpPct = (playerHp / playerHpMax) * 100;
@@ -185,33 +205,33 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({
     move.ppLeft = Math.max(0, move.ppLeft - 1);
 
     if (playerStatus?.type === 'confuse' && Math.random() < 0.33) {
-      addMsg('You are confused and hurt yourself!');
+      addMsg(`${playerLabel} is confused and hurt itself!`);
       setPlayerHp(p => Math.max(0, p - Math.floor(Math.random() * 8 + 3)));
       shake('player');
       setPlayerStatus(p => p ? (p.turnsLeft <= 1 ? null : { ...p, turnsLeft: p.turnsLeft - 1 }) : null);
       await delay(1400); enemyTurn(); return;
     }
     if (playerStatus?.type === 'paralyze' && Math.random() < 0.25) {
-      addMsg("You're paralyzed and can't move!");
+      addMsg(`${playerLabel} is paralyzed and can't move!`);
       setPlayerStatus(p => p ? (p.turnsLeft <= 1 ? null : { ...p, turnsLeft: p.turnsLeft - 1 }) : null);
       await delay(1200); enemyTurn(); return;
     }
 
-    addMsg(`You used ${move.name}!`);
+    addMsg(`${playerLabel} used ${move.name}!`);
 
     if (move.power === 0) {
       if (move.effect === 'heal') {
         const healed = Math.floor(playerHpMax * 0.25);
         setPlayerHp(p => Math.min(playerHpMax, p + healed));
-        addMsg(`You used ${move.name}!`, `+${healed} HP`);
+        addMsg(`${playerLabel} used ${move.name}!`, `+${healed} HP`);
       } else if (move.effect === 'raise_atk') {
         setAtkBoost(p => Math.min(3, p + 1));
-        addMsg(`You used ${move.name}!`, 'Attack rose!');
+        addMsg(`${playerLabel} used ${move.name}!`, 'Attack rose!');
       } else if (move.effect === 'shield_break') {
         const ns = Math.max(0, wildShield - 1);
         setWildShield(ns);
-        if (ns === 0 && !isBroken) { setIsBroken(true); addMsg(`You used ${move.name}!`, `${wildCreature.name} is BROKEN!`); }
-        else addMsg(`You used ${move.name}!`, 'Shield cracked!');
+        if (ns === 0 && !isBroken) { setIsBroken(true); addMsg(`${playerLabel} used ${move.name}!`, `${wildCreature.name} is BROKEN!`); }
+        else addMsg(`${playerLabel} used ${move.name}!`, 'Shield cracked!');
       } else {
         if (move.effect && move.effectChance && Math.random() < move.effectChance && !wildStatus) {
           const statusable = ['burn','freeze','paralyze','confuse'];

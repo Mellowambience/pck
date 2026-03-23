@@ -27,7 +27,7 @@ Respond in character. Keep it brief (1-3 sentences). Be mysterious, quirky, or h
 
   try {
     const response = await client.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -113,7 +113,7 @@ Available Tile Types:
 
   try {
     const response = await client.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",

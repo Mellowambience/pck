@@ -30,6 +30,7 @@ export class GameEngine {
   onInteract: (x: number, y: number, tileType: number) => void;
   onEntityInteract: (entity: Entity) => void;
   onEncounter?: (creature: any) => void;
+  onBiomeChange?: (biome: string) => void;
 
   isPaused: boolean = false;
   zoom: number = 3; // Zoomed in focus
@@ -69,13 +70,15 @@ export class GameEngine {
     onInteract: (x: number, y: number, tileType: number) => void, 
     onEntityInteract: (entity: Entity) => void,
     onEncounter?: (creature: any) => void,
-    apiKey?: string
+    apiKey?: string,
+    onBiomeChange?: (biome: string) => void
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.onInteract = onInteract;
     this.onEntityInteract = onEntityInteract;
     this.onEncounter = onEncounter;
+    this.onBiomeChange = onBiomeChange;
     this.apiKey = apiKey || '';
 
     this.loadBuiltInSprites();
@@ -611,17 +614,63 @@ export class GameEngine {
     this.isPaused = true;
     this.keys = {};
     this.player.path = [];
-    
-    const monsters = [
-      { name: 'Emberfox', type: 'Fire', hp: 20, maxHp: 20, color: '#ff5500', level: Math.floor(Math.random() * 5) + 2, shield: 2 },
-      { name: 'Aquapup', type: 'Water', hp: 22, maxHp: 22, color: '#00aaff', level: Math.floor(Math.random() * 5) + 2, shield: 3 },
-      { name: 'Leafbug', type: 'Grass', hp: 18, maxHp: 18, color: '#55aa00', level: Math.floor(Math.random() * 5) + 2, shield: 1 },
-      { name: 'Aether-kin', type: 'Fairy', hp: 25, maxHp: 25, color: '#e0aaff', level: Math.floor(Math.random() * 5) + 5, shield: 4 },
-    ];
-    const wild = monsters[Math.floor(Math.random() * monsters.length)];
-    
+
+    // Determine current biome from the tile the player is standing on
+    const tile = this.getTile(this.player.gridX, this.player.gridY);
+    const biome = tile === TILE_WATER || tile === TILE_DEEP_WATER ? 'water'
+                : tile === TILE_SAND  ? 'sand'
+                : tile === TILE_MOUNTAIN ? 'mountain'
+                : tile === TILE_PATH  ? 'path'
+                : 'grass';
+
+    type EncounterEntry = { name: string; type: string; hp: number; maxHp: number; color: string; level: number; shield: number };
+
+    const BIOME_POOLS: Record<string, EncounterEntry[]> = {
+      grass: [
+        { name: 'Emberfox',   type: 'Fire',   hp: 22, maxHp: 22, color: '#f97316', level: 0, shield: 2 },
+        { name: 'Leafbug',    type: 'Grass',  hp: 18, maxHp: 18, color: '#22c55e', level: 0, shield: 1 },
+        { name: 'Aether-Kin', type: 'Fairy',  hp: 25, maxHp: 25, color: '#c084fc', level: 0, shield: 4 },
+        { name: 'Mosshound',  type: 'Grass',  hp: 26, maxHp: 26, color: '#16a34a', level: 0, shield: 2 },
+        { name: 'Glimmerfly', type: 'Fairy',  hp: 20, maxHp: 20, color: '#e879f9', level: 0, shield: 3 },
+      ],
+      water: [
+        { name: 'Aquapup',    type: 'Water',  hp: 22, maxHp: 22, color: '#3b82f6', level: 0, shield: 3 },
+        { name: 'Leafbug',    type: 'Grass',  hp: 18, maxHp: 18, color: '#22c55e', level: 0, shield: 1 },
+        { name: 'Aquapup',    type: 'Water',  hp: 22, maxHp: 22, color: '#3b82f6', level: 0, shield: 3 }, // weighted
+      ],
+      sand: [
+        { name: 'Dunecrawler', type: 'Sand',  hp: 24, maxHp: 24, color: '#d97706', level: 0, shield: 2 },
+        { name: 'Sandsprite',  type: 'Wind',  hp: 20, maxHp: 20, color: '#a3e635', level: 0, shield: 2 },
+        { name: 'Emberfox',    type: 'Fire',  hp: 22, maxHp: 22, color: '#f97316', level: 0, shield: 2 },
+      ],
+      mountain: [
+        { name: 'RoadWraith',  type: 'Shadow', hp: 20, maxHp: 20, color: '#7c3aed', level: 0, shield: 3 },
+        { name: 'Sandsprite',  type: 'Wind',   hp: 20, maxHp: 20, color: '#a3e635', level: 0, shield: 2 },
+        { name: 'Dunecrawler', type: 'Sand',   hp: 24, maxHp: 24, color: '#d97706', level: 0, shield: 2 },
+      ],
+      path: [
+        { name: 'RoadWraith',  type: 'Shadow', hp: 20, maxHp: 20, color: '#7c3aed', level: 0, shield: 3 },
+        { name: 'Emberfox',    type: 'Fire',   hp: 22, maxHp: 22, color: '#f97316', level: 0, shield: 2 },
+        { name: 'Aether-Kin',  type: 'Fairy',  hp: 25, maxHp: 25, color: '#c084fc', level: 0, shield: 4 },
+      ],
+    };
+
+    const pool = BIOME_POOLS[biome] || BIOME_POOLS['grass'];
+    const template = { ...pool[Math.floor(Math.random() * pool.length)] };
+    // Scale level to rough player position (distance from spawn)
+    const dist = Math.floor(Math.sqrt(this.player.gridX ** 2 + this.player.gridY ** 2) / 8);
+    const lvl = Math.max(1, Math.min(30, dist + Math.floor(Math.random() * 4) + 1));
+    template.level = lvl;
+    // Scale HP with level
+    const scaledHp = Math.round(template.maxHp * (1 + lvl * 0.12));
+    template.hp = scaledHp;
+    template.maxHp = scaledHp;
+
+    // Emit current biome so App can use it
+    if (this.onBiomeChange) this.onBiomeChange(biome);
+
     if (this.onEncounter) {
-      this.onEncounter(wild);
+      this.onEncounter(template);
     }
   }
 
