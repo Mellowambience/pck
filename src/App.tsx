@@ -9,6 +9,8 @@ import { auth, db } from './firebase';
 import { signInAnonymously, onAuthStateChanged, User, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { BattleScreen } from './components/BattleScreen';
+import { EvolutionScreen } from './components/EvolutionScreen';
+import { checkEvolution, applyEvolution, EvolutionChain } from './game/Evolutions';
 import { SpiritDex } from './components/SpiritDex';
 import { SpiritBox, StoredSpirit } from './components/SpiritBox';
 import { PLAYER_MOVES } from './game/Moves';
@@ -18,6 +20,11 @@ import { AnimatePresence } from 'motion/react';
 export default function App() {
   const [isThinking, setIsThinking] = useState(false);
   const [resonance, setResonance] = useState(0);
+  const [playerLevel, setPlayerLevel] = useState(1);
+  const [playerXp, setPlayerXp] = useState(0);
+  const [playerHpMax, setPlayerHpMax] = useState(60);
+  const [pendingEvo, setPendingEvo] = useState<{ spiritId: string; chain: EvolutionChain } | null>(null);
+  const [spiritBonds, setSpiritBonds] = useState<Record<string, number>>({});
   
   // Auth & Persistence State
   const [user, setUser] = useState<User | null>(null);
@@ -215,6 +222,31 @@ export default function App() {
     if (type === 'tame') updateQuest('q2', 1);
   };
 
+  const handleXpGain = (xp: number) => {
+    setPlayerXp(prev => {
+      const next = prev + xp;
+      const needed = playerLevel * 50;
+      if (next >= needed) {
+        setPlayerLevel(lvl => lvl + 1);
+        setPlayerHpMax(h => h + 8);
+        return next - needed;
+      }
+      return next;
+    });
+  };
+
+  const checkSpiritEvolutions = (updatedSpirits: typeof tamedSpirits) => {
+    for (const s of updatedSpirits) {
+      const bond = spiritBonds[s.id] || 0;
+      const biome = 'grass'; // TODO: pass real biome from engine
+      const chain = checkEvolution(s.name, s.level, bond, biome);
+      if (chain) {
+        setPendingEvo({ spiritId: s.id, chain });
+        break;
+      }
+    }
+  };
+
   const addSpirit = (name: string, type: string, level: number) => {
     const newSpirit: StoredSpirit = {
       id: Math.random().toString(36).substring(2, 9),
@@ -235,8 +267,12 @@ export default function App() {
     setResonance(prev => Math.min(100, prev + 25));
     handleQuestEvents('tame');
     setChatHistory(prev => [...prev, { role: 'system', text: `You captured ${battleState.name}! It joins your spirit pack.` }]);
+    // Give XP for the catch
+    handleXpGain(Math.floor((battleState.level || 1) * 15 + 10));
     setBattleState(null);
     gameRef.current?.resumeGame();
+    // Defer evolution check so state has settled
+    setTimeout(() => setTamedSpirits(ss => { checkSpiritEvolutions(ss); return ss; }), 300);
   };
 
   const handleBattleFlee = () => {
@@ -296,6 +332,15 @@ export default function App() {
 
         if (response.resonanceChange) {
           setResonance(prev => Math.max(0, Math.min(100, prev + response.resonanceChange!)));
+          // Bond gain: party spirits get +5 bond per interaction
+          setSpiritBonds(prev => {
+            const updated = { ...prev };
+            for (const s of tamedSpirits.filter(sp => sp.inParty)) {
+              updated[s.id] = Math.min(100, (prev[s.id] || 0) + 5);
+            }
+            return updated;
+          });
+          setTimeout(() => setTamedSpirits(ss => { checkSpiritEvolutions(ss); return ss; }), 200);
         }
 
         if (response.narrativeResponse) {
@@ -367,6 +412,9 @@ export default function App() {
             onCatch={handleBattleCatch}
             aetherOrbs={inventory.aetherOrb || 0}
             onUseAetherOrb={() => setInventory(prev => ({ ...prev, aetherOrb: Math.max(0, (prev.aetherOrb || 0) - 1) }))}
+            playerLevel={playerLevel}
+            playerHpMax={playerHpMax}
+            onXpGain={handleXpGain}
           />
         )}
       </AnimatePresence>
@@ -445,10 +493,37 @@ export default function App() {
         </div>
       )}
 
+      {/* Evolution Screen */}
+      <AnimatePresence>
+        {pendingEvo && (() => {
+          const spirit = tamedSpirits.find(s => s.id === pendingEvo.spiritId);
+          if (!spirit) return null;
+          return (
+            <EvolutionScreen
+              key={pendingEvo.spiritId}
+              spirit={spirit}
+              chain={pendingEvo.chain}
+              onComplete={(newName) => {
+                setTamedSpirits(prev => prev.map(s => {
+                  if (s.id !== pendingEvo!.spiritId) return s;
+                  const evolved = applyEvolution(s, pendingEvo!.chain);
+                  return { ...s, ...evolved };
+                }));
+                setSpiritBonds(prev => ({ ...prev, [pendingEvo!.spiritId]: 0 }));
+                setPendingEvo(null);
+                setChatHistory(prev => [...prev, { role: 'system', text: `${spirit.name} evolved into ${newName}!` }]);
+              }}
+              onCancel={() => setPendingEvo(null)}
+            />
+          );
+        })()}
+      </AnimatePresence>
+
       {/* Spirit Box Modal */}
       {showSpiritBox && (
         <SpiritBox
           spirits={tamedSpirits}
+          bonds={spiritBonds}
           onClose={() => setShowSpiritBox(false)}
           onToggleParty={handleToggleParty}
           onRelease={handleRelease}
@@ -566,6 +641,20 @@ export default function App() {
             className={`h-full transition-all duration-500 ease-out ${resonance >= 100 ? 'bg-indigo-400 shadow-[0_0_12px_rgba(129,140,248,0.8)]' : 'bg-indigo-900'}`}
             style={{ width: `${resonance}%` }}
           />
+        </div>
+
+        {/* Player Level + XP */}
+        <div className="flex items-center gap-3 mt-1">
+          <span className="text-[10px] font-mono text-purple-300 font-bold uppercase tracking-widest">
+            Lv {playerLevel}
+          </span>
+          <div className="w-40 h-1 bg-neutral-900 rounded-full overflow-hidden border border-white/5">
+            <div className="h-full bg-purple-500 transition-all duration-500"
+              style={{ width: `${Math.min(100, (playerXp / (playerLevel * 50)) * 100)}%` }} />
+          </div>
+          <span className="text-[10px] font-mono text-neutral-500">
+            {playerXp}/{playerLevel * 50} XP
+          </span>
         </div>
       </div>
 

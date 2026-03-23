@@ -16,6 +16,7 @@ export interface StoredSpirit {
 
 interface SpiritBoxProps {
   spirits: StoredSpirit[];
+  bonds?: Record<string, number>;
   onClose: () => void;
   onToggleParty: (id: string) => void;
   onRelease: (id: string) => void;
@@ -67,7 +68,7 @@ function getMoveTypeColor(moveName: string): string {
   return '#94a3b8';
 }
 
-export const SpiritBox: React.FC<SpiritBoxProps> = ({ spirits, onClose, onToggleParty, onRelease }) => {
+export const SpiritBox: React.FC<SpiritBoxProps> = ({ spirits, bonds = {}, onClose, onToggleParty, onRelease }) => {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<StoredSpirit | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
