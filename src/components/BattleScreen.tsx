@@ -102,12 +102,12 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({
   const [flashPlayer, setFlashPlayer] = useState(false);
   const [showMoves, setShowMoves] = useState(false);
 
-  // Active spirit — first in-party spirit, or null (player fights bare-handed)
-  const activeSpirit = partySpirits[0] ?? null;
+  const [activeSpiritIdx, setActiveSpiritIdx] = useState(0);
+  const [showSwitch, setShowSwitch] = useState(false);
+  // Active spirit — driven by activeSpiritIdx, falls back to bare-handed
+  const activeSpirit = partySpirits[activeSpiritIdx] ?? null;
   const playerLabel = activeSpirit ? activeSpirit.name : 'You';
-  const activeMoveNames: string[] = activeSpirit?.moves?.length
-    ? activeSpirit.moves
-    : PLAYER_MOVES;
+  const activeMoveNames: string[] = activeSpirit?.moves?.length ? activeSpirit.moves : PLAYER_MOVES;
   const typeColor = TYPE_COLORS[wildCreature.type] || '#94a3b8';
   const hpPct = (wildHp / wildCreature.maxHp) * 100;
   const playerHpPct = (playerHp / playerHpMax) * 100;
@@ -420,6 +420,25 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({
         </div>
 
         <AnimatePresence>
+          {/* Party switch panel */}
+          {showSwitch && partySpirits.length > 1 && (
+            <div className="px-4 pb-2 flex flex-col gap-1.5">
+              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-1">Choose spirit:</p>
+              {partySpirits.map((s, i) => (
+                <button key={s.id} onClick={() => { setActiveSpiritIdx(i); setShowSwitch(false); addMsg(`Go, ${s.name}!`); }}
+                  className="flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-mono transition-all"
+                  style={{
+                    borderColor: i === activeSpiritIdx ? (TYPE_COLORS[s.type] || '#94a3b8') + '80' : '#334155',
+                    background: i === activeSpiritIdx ? (TYPE_COLORS[s.type] || '#94a3b8') + '15' : 'transparent',
+                    color: i === activeSpiritIdx ? TYPE_COLORS[s.type] || '#94a3b8' : '#94a3b8',
+                  }}>
+                  <span>{s.name}</span>
+                  <span className="text-slate-500">Lv {s.level} · {s.type}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {showMoves && phase === 'choose' && (
             <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }} className="space-y-2">
               <div className="grid grid-cols-2 gap-2">

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GameCanvas, GameCanvasRef } from './components/GameCanvas';
-import { generateProceduralResponse } from './services/ProceduralWorld';
+import { generateProceduralResponse, type ItemDrop } from './services/ProceduralWorld';
 import { tileNames } from './game/MapData';
 import { Sparkles, Zap, MessageSquare, X, Send, Key, Map as MapIcon } from 'lucide-react';
 import { Minimap } from './components/Minimap';
@@ -237,6 +237,22 @@ export default function App() {
     });
   };
 
+  const handleItemDrop = (drop: ItemDrop) => {
+    setInventory(prev => ({ ...prev, [drop.item]: (prev[drop.item] || 0) + 1 }));
+    setChatHistory(prev => [...prev, { role: 'dm', text: `✨ A ${drop.item} materialized from the disturbance!` }]);
+    // Immediately check if any spirit can evolve with this item
+    setTimeout(() => {
+      setTamedSpirits(ss => {
+        for (const s of ss) {
+          const bond = spiritBonds[s.id] || 0;
+          const chain = checkEvolution(s.name, s.level, bond, currentBiome, drop.item);
+          if (chain) { setPendingEvo({ spiritId: s.id, chain }); break; }
+        }
+        return ss;
+      });
+    }, 500);
+  };
+
   const checkSpiritEvolutions = (updatedSpirits: typeof tamedSpirits) => {
     for (const s of updatedSpirits) {
       const bond = spiritBonds[s.id] || 0;
@@ -307,13 +323,20 @@ export default function App() {
     const playerPos = gameRef.current?.getPlayerPosition() || { x: 0, y: 0 };
 
     if (resonance < 100) {
-      // Local Procedural Update (Saves Tokens)
-      const response = generateProceduralResponse(x, y, tileType, playerPos);
+      // Local Procedural Update (saves tokens, now with full narrative + entities + item drops)
+      const response = generateProceduralResponse(x, y, tileType, playerPos, handleItemDrop);
       if (response.mapUpdates && response.mapUpdates.length > 0) {
         gameRef.current?.updateMap(response.mapUpdates);
       }
-      // Increase resonance. Every 10 clicks triggers an Atlas Event.
-      setResonance(prev => Math.min(100, prev + 10)); 
+      if (response.entityUpdates && response.entityUpdates.length > 0) {
+        response.entityUpdates.forEach(ent => {
+          gameRef.current?.spawnEntity(ent.x, ent.y, ent.type as any, ent.name, ent.isCorrupted);
+        });
+      }
+      if (response.narrativeResponse) {
+        setChatHistory(prev => [...prev, { role: 'dm', text: response.narrativeResponse! }]);
+      }
+      setResonance(prev => Math.min(100, prev + (response.resonanceChange ?? 10)));
     } else {
       // Atlas Event (Gemini API Call)
       setIsThinking(true);
@@ -595,6 +618,9 @@ export default function App() {
             <div className="flex justify-between"><span>Aether Orbs</span><span>{inventory.aetherOrb}</span></div>
             <div className="flex justify-between"><span>Potions</span><span>{inventory.potion}</span></div>
             <div className="flex justify-between"><span>Roses</span><span>{inventory.roses}</span></div>
+            {Object.entries(inventory).filter(([k]) => !['aetherOrb','potion','roses'].includes(k) && (inventory[k] as number) > 0).map(([k, v]) => (
+              <div key={k} className="flex justify-between text-purple-300"><span>✨ {k}</span><span>{v as number}</span></div>
+            ))}
           </div>
           <div className="space-y-3">
             <div className="flex flex-col gap-1">
