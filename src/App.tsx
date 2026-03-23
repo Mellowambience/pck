@@ -10,6 +10,8 @@ import { signInAnonymously, onAuthStateChanged, User, GoogleAuthProvider, signIn
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { BattleScreen } from './components/BattleScreen';
 import { SpiritDex } from './components/SpiritDex';
+import { SpiritBox, StoredSpirit } from './components/SpiritBox';
+import { PLAYER_MOVES } from './game/Moves';
 import { QuestLog } from './components/QuestLog';
 import { AnimatePresence } from 'motion/react';
 
@@ -32,7 +34,8 @@ export default function App() {
   const [demonsTamed, setDemonsTamed] = useState(0);
   const [apiKey, setApiKey] = useState(process.env.GEMINI_API_KEY || "");
   const [battleState, setBattleState] = useState<any>(null);
-  const [tamedSpirits, setTamedSpirits] = useState<{name:string,type:string,level:number}[]>([]);
+  const [tamedSpirits, setTamedSpirits] = useState<StoredSpirit[]>([]);
+  const [showSpiritBox, setShowSpiritBox] = useState(false);
   const [inventory, setInventory] = useState<{[key:string]: number}>({ aetherOrb: 5, potion: 1, roses: 0 });
   const [quests, setQuests] = useState<{id:string,title:string,progress:number,goal:number,completed:boolean}[]>([
     { id: 'q1', title: 'Heal 3 Leylines', progress: 0, goal: 3, completed: false },
@@ -212,15 +215,22 @@ export default function App() {
     if (type === 'tame') updateQuest('q2', 1);
   };
 
+  const addSpirit = (name: string, type: string, level: number) => {
+    const newSpirit: StoredSpirit = {
+      id: Math.random().toString(36).substring(2, 9),
+      name, type, level,
+      hp: 20 + level * 5,
+      maxHp: 20 + level * 5,
+      moves: PLAYER_MOVES.slice(0, 4),
+      catchDate: new Date().toISOString(),
+      inParty: tamedSpirits.filter(s => s.inParty).length < 6,
+    };
+    setTamedSpirits(prev => [...prev, newSpirit]);
+  };
+
   const handleBattleCatch = () => {
     if (!battleState) return;
-
-    setTamedSpirits(prev => {
-      const existing = prev.some(s => s.name === battleState.name && s.type === battleState.type);
-      if (existing) return prev;
-      return [...prev, { name: battleState.name, type: battleState.type, level: battleState.level || 1 }];
-    });
-
+    addSpirit(battleState.name, battleState.type, battleState.level || 1);
     setDemonsTamed(prev => prev + 1);
     setResonance(prev => Math.min(100, prev + 25));
     handleQuestEvents('tame');
@@ -317,6 +327,15 @@ export default function App() {
       setIsThinking(false);
     }
   };
+
+  const handleToggleParty = (id: string) => {
+    setTamedSpirits(prev => prev.map(s => s.id === id ? { ...s, inParty: !s.inParty } : s));
+  };
+
+  const handleRelease = (id: string) => {
+    setTamedSpirits(prev => prev.filter(s => s.id !== id));
+  };
+
 
   return (
     <div className="h-screen w-full bg-neutral-950 relative font-sans text-neutral-200 overflow-hidden">
@@ -426,9 +445,40 @@ export default function App() {
         </div>
       )}
 
+      {/* Spirit Box Modal */}
+      {showSpiritBox && (
+        <SpiritBox
+          spirits={tamedSpirits}
+          onClose={() => setShowSpiritBox(false)}
+          onToggleParty={handleToggleParty}
+          onRelease={handleRelease}
+        />
+      )}
+
       {/* Mission Log + SpiritDex */}
       <div className="absolute top-6 right-6 flex flex-col gap-2 z-40 pointer-events-none">
-        <SpiritDex spirits={tamedSpirits} />
+        <button
+          onClick={() => setShowSpiritBox(true)}
+          className="bg-black/40 backdrop-blur-md border border-white/10 p-3 rounded-2xl w-64 shadow-xl pointer-events-auto hover:border-indigo-500/40 transition-all group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📦</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-indigo-300 group-hover:text-indigo-200">Spirit Box</span>
+            </div>
+            <span className="text-xs font-mono text-slate-400">{tamedSpirits.length} caught</span>
+          </div>
+          {tamedSpirits.length > 0 && (
+            <div className="flex gap-1 mt-2 flex-wrap">
+              {tamedSpirits.filter(s => s.inParty).slice(0, 6).map(s => (
+                <span key={s.id} className="text-base">
+                  {s.type === 'Fire' ? '🦊' : s.type === 'Water' ? '🐾' : s.type === 'Grass' ? '🐛' :
+                   s.type === 'Shadow' ? '👻' : s.type === 'Sand' ? '🦂' : s.type === 'Wind' ? '🦋' : '✨'}
+                </span>
+              ))}
+            </div>
+          )}
+        </button>
         <QuestLog quests={quests} />
         <div className="bg-black/40 backdrop-blur-md border border-white/10 p-4 rounded-2xl w-64 shadow-xl pointer-events-auto">
           <div className="flex items-center gap-2 mb-3">

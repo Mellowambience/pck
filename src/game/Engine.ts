@@ -1,4 +1,12 @@
-import { TILE_SIZE, CHUNK_SIZE, generateChunk, TILE_GRASS, TILE_TALL_GRASS, TILE_WATER, TILE_PATH, TILE_TREE } from './MapData';
+import { TILE_SIZE, CHUNK_SIZE, generateChunk, TILE_GRASS, TILE_TALL_GRASS, TILE_WATER, TILE_PATH, TILE_TREE, TILE_WALL, TILE_DOOR, TILE_SAND, TILE_DEEP_WATER, TILE_MOUNTAIN, SOLID_TILES } from './MapData';
+import {
+  PAL, Palette, PixelSprite, drawPixelSprite,
+  drawGrassTile, drawTallGrassTile, drawWaterTile, drawDeepWaterTile,
+  drawPathTile, drawTreeTile, drawSandTile, drawWallTile, drawDoorTile, drawMountainTile,
+  SPRITE_PLAYER_DOWN, SPRITE_PLAYER_UP, SPRITE_PLAYER_LEFT,
+  SPRITE_TRAVELER, SPRITE_SHEEP, SPRITE_ROSE, SPRITE_SHRINE,
+  SPRITE_CRYSTAL, SPRITE_FIRE, SPRITE_SIGN, SPRITE_LEYLINE, SPRITE_DEMON,
+} from './PixelArt';
 
 export interface Entity {
   id: string;
@@ -815,54 +823,29 @@ export class GameEngine {
         const px = x * TILE_SIZE;
         const py = y * TILE_SIZE;
         
-        // Base tile colors (Pokémon Crystal/Yellow inspired palette)
-        if (tile === TILE_GRASS) ctx.fillStyle = '#9bbc0f'; // Light green grass
-        else if (tile === TILE_TREE) ctx.fillStyle = '#9bbc0f'; // Tree base (grass)
-        else if (tile === TILE_WATER) ctx.fillStyle = '#306230'; // Dark green-blue water
-        else if (tile === TILE_PATH) ctx.fillStyle = '#c6b27d'; // Sandy path
-        else if (tile === TILE_TALL_GRASS) ctx.fillStyle = '#4a90e2'; // Blue-tinted tall grass
-        else ctx.fillStyle = '#000';
-
-        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-
-        // Details
-        if (tile === TILE_GRASS || tile === TILE_TREE || tile === TILE_TALL_GRASS) {
-          // Grass blades (Pokémon Crystal style)
-          ctx.fillStyle = tile === TILE_TALL_GRASS ? '#8bb956' : '#9bbc0f';
-          for(let i=0; i<4; i++) {
-            let rx = pseudoRandom(x, y+i) * (TILE_SIZE - 2);
-            let ry = pseudoRandom(x+i, y) * (TILE_SIZE - 4);
-            ctx.fillRect(px + rx, py + ry, 2, tile === TILE_TALL_GRASS ? 8 : 4);
-          }
+        // GBC pixel art tile drawing
+        const pr_ = pseudoRandom;
+        switch (tile) {
+          case TILE_GRASS:      drawGrassTile(ctx, px, py, TILE_SIZE, pr_, x, y); break;
+          case TILE_TALL_GRASS: drawTallGrassTile(ctx, px, py, TILE_SIZE, pr_, x, y, this.globalTime); break;
+          case TILE_WATER:      drawWaterTile(ctx, px, py, TILE_SIZE, x, y, this.globalTime); break;
+          case TILE_DEEP_WATER: drawDeepWaterTile(ctx, px, py, TILE_SIZE, x, y, this.globalTime); break;
+          case TILE_PATH:       drawPathTile(ctx, px, py, TILE_SIZE, pr_, x, y); break;
+          case TILE_TREE:       drawTreeTile(ctx, px, py, TILE_SIZE, pr_, x, y); break;
+          case TILE_WALL:       drawWallTile(ctx, px, py, TILE_SIZE); break;
+          case TILE_DOOR:       drawDoorTile(ctx, px, py, TILE_SIZE); break;
+          case TILE_SAND:       drawSandTile(ctx, px, py, TILE_SIZE, pr_, x, y); break;
+          case TILE_MOUNTAIN:   drawMountainTile(ctx, px, py, TILE_SIZE); break;
+          default:
+            ctx.fillStyle = '#111827';
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
         }
 
-        if (tile === TILE_WATER) {
-          // Water waves (simplified for retro style)
-          ctx.fillStyle = 'rgba(255,255,255,0.3)';
-          let waveOffset = Math.sin(this.globalTime * 2 + x * 0.5 + y * 0.5) * 2;
-          ctx.fillRect(px + 4 + waveOffset, py + 8, 8, 1);
-          ctx.fillRect(px + 16 - waveOffset, py + 20, 6, 1);
-        }
-
-        if (tile === TILE_TREE) {
-          // Tree shadow (subtle)
-          ctx.fillStyle = 'rgba(0,0,0,0.2)';
-          ctx.beginPath(); ctx.ellipse(px + 16, py + 28, 10, 4, 0, 0, Math.PI*2); ctx.fill();
-          // Trunk (brown)
-          ctx.fillStyle = '#8b4513';
-          ctx.fillRect(px + 12, py + 16, 8, 14);
-          // Leaves (green, more pixelated)
-          ctx.fillStyle = '#306230';
-          ctx.fillRect(px + 4, py + 4, 24, 16);
-          ctx.fillStyle = '#4a90e2'; // lighter green for highlights
-          ctx.fillRect(px + 8, py + 6, 16, 10);
-        } 
-
-        // Draw hover highlight
+        // Hover highlight
         if (x === this.hoverX && y === this.hoverY && !this.isPaused) {
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+          ctx.lineWidth = 1 / this.zoom;
+          ctx.strokeRect(px + 0.5, py + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
         }
       }
     }
@@ -895,10 +878,72 @@ export class GameEngine {
       ctx.beginPath(); ctx.ellipse(px + 16, py + 28 + bob, 10, 5, 0, 0, Math.PI*2); ctx.fill();
 
       if (item.isPlayer) {
-        this.drawSprite(px, py, this.sprites['player']);
+        // GBC pixel art player
+        const S = 2;
+        const dir = this.player.direction;
+        if (dir === 'up') drawPixelSprite(ctx, SPRITE_PLAYER_UP, PAL.PLAYER, px, py, S);
+        else if (dir === 'left') drawPixelSprite(ctx, SPRITE_PLAYER_LEFT, PAL.PLAYER, px, py, S);
+        else if (dir === 'right') drawPixelSprite(ctx, SPRITE_PLAYER_LEFT, PAL.PLAYER, px, py, S, true);
+        else drawPixelSprite(ctx, SPRITE_PLAYER_DOWN, PAL.PLAYER, px, py, S);
       } else {
         const ent = item as any;
-        this.drawSprite(px, py, this.sprites[ent.type]);
+        const t = this.globalTime;
+        const S = 2;
+        switch (ent.type) {
+          case 'sheep':    drawPixelSprite(ctx, SPRITE_SHEEP, PAL.SHEEP, px, py, S); break;
+          case 'traveler':
+            drawPixelSprite(ctx, SPRITE_TRAVELER, PAL.TRAVELER, px, py, S);
+            ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(px + 2, py - 9, 28, 8);
+            ctx.fillStyle = PAL.TRAVELER[0]; ctx.font = '5px monospace';
+            ctx.fillText((ent.name || 'NPC').slice(0, 6), px + 3, py - 2);
+            break;
+          case 'rose':
+            drawPixelSprite(ctx, SPRITE_ROSE, PAL.ROSE, px, py, S);
+            ctx.globalAlpha = 0.25 + Math.sin(t * 3) * 0.15;
+            ctx.fillStyle = PAL.ROSE[0]; ctx.beginPath(); ctx.arc(px + 16, py + 12, 10, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1; break;
+          case 'shrine':
+            drawPixelSprite(ctx, SPRITE_SHRINE, PAL.SHRINE, px, py, S);
+            ctx.globalAlpha = 0.3 + Math.sin(t * 2) * 0.2;
+            ctx.fillStyle = PAL.SHRINE[1]; ctx.beginPath(); ctx.arc(px + 16, py + 16, 12, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1; break;
+          case 'crystal':
+            drawPixelSprite(ctx, SPRITE_CRYSTAL, PAL.CRYSTAL, px, py, S);
+            for (let i = 0; i < 3; i++) {
+              const off = ((t * 1.5 + i * 1.1) % 2.5);
+              ctx.globalAlpha = 0.7 * (1 - off / 2.5);
+              ctx.fillStyle = PAL.CRYSTAL[0];
+              ctx.fillRect(px + 10 + Math.round(Math.sin(t * 2 + i) * 5), py + 20 - Math.round(off * 7), 2, 2);
+            }
+            ctx.globalAlpha = 1; break;
+          case 'fire':
+            drawPixelSprite(ctx, SPRITE_FIRE, PAL.FIRE, px, py, S);
+            for (let i = 0; i < 3; i++) {
+              const off = ((t * 5 + i * 1.3) % 4);
+              ctx.globalAlpha = 0.8 * (1 - off / 4);
+              ctx.fillStyle = PAL.FIRE[0];
+              ctx.fillRect(px + 12 + Math.round(Math.sin(t * 4 + i) * 3), py + 16 - Math.round(off * 3), 2, 2);
+            }
+            ctx.globalAlpha = 1; break;
+          case 'sign':  drawPixelSprite(ctx, SPRITE_SIGN, PAL.SIGN, px, py, S); break;
+          case 'leyline': {
+            const lpal: Palette = ent.isCorrupted ? ['#fdba74', '#f97316', '#c2410c', '#7c2d12'] : PAL.LEYLINE;
+            drawPixelSprite(ctx, SPRITE_LEYLINE, lpal, px, py, S);
+            const al = (Math.sin(t * 2) + 1) / 2;
+            ctx.globalAlpha = al * 0.35;
+            ctx.strokeStyle = lpal[1]; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(px + 16, py + 16, 16 + al * 4, 0, Math.PI * 2); ctx.stroke();
+            ctx.globalAlpha = 1; break;
+          }
+          case 'demon':
+            drawPixelSprite(ctx, SPRITE_DEMON, PAL.DEMON, px, py, S);
+            ctx.globalAlpha = 0.7 + Math.sin(t * 7) * 0.3;
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(px + 10, py + 12, 3, 3); ctx.fillRect(px + 19, py + 12, 3, 3);
+            ctx.globalAlpha = 1; break;
+          default:
+            ctx.fillStyle = '#7c3aed'; ctx.fillRect(px + 8, py + 8, 16, 16);
+        }
       }
     }
 
