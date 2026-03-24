@@ -28,7 +28,12 @@ The game features authentic retro pixel art inspired by Pokémon Crystal and Yel
    npm install
    ```
 
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key (optional - game works with fallback sprites)
+2. Set environment variables in `.env.local`:
+   - `GEMINI_API_KEY` (optional, game works with fallback sprites)
+   - `SPRITE_AUTH_MODE` (`auto`, `firebase`, `token`, or `none`)
+   - For `firebase` mode: `FIREBASE_SERVICE_ACCOUNT_JSON` (or `GOOGLE_APPLICATION_CREDENTIALS`)
+   - Optional for `firebase` mode: `SPRITE_ALLOW_ANONYMOUS_AUTH=false` and `SPRITE_AUTH_ALLOWED_EMAILS`
+   - For `token` mode: `SPRITE_API_TOKEN` and `VITE_SPRITE_API_TOKEN` (same value)
 
 3. Run the development server:
    ```bash
@@ -36,6 +41,17 @@ The game features authentic retro pixel art inspired by Pokémon Crystal and Yel
    ```
 
 4. Open http://localhost:3000 in your browser
+
+## API Security
+
+- `POST /api/generate-sprite` supports server-side auth modes:
+- `firebase` (recommended): validates `Authorization: Bearer <Firebase ID token>` with Firebase Admin.
+- In `firebase` mode, anonymous users are rejected by default unless `SPRITE_ALLOW_ANONYMOUS_AUTH=true`.
+- `SPRITE_AUTH_ALLOWED_EMAILS` can further restrict generation to a specific set of signed-in users.
+- `token`: validates shared header `x-sprite-auth: <token>`.
+- `none`: disables endpoint auth (not recommended outside local debugging).
+- `auto` (default): uses `firebase` when admin credentials exist, otherwise `token` if configured.
+- Requests are also rate limited per IP and input-validated.
 
 ## Controls
 
@@ -47,10 +63,16 @@ The game features authentic retro pixel art inspired by Pokémon Crystal and Yel
 
 ### Sprite Generation
 
-Sprites are generated using AI prompts specifically crafted for retro pixel art style:
+Sprites now default to a local Crystal-style template pipeline with locked palettes, hand-tuned silhouettes, and stable seeded variants for creatures and NPCs:
 
 ```bash
 npm run generate-sprites
+```
+
+If you explicitly want to hit the server sprite endpoint instead, run:
+
+```bash
+SPRITE_GENERATOR_MODE=remote npm run generate-sprites
 ```
 
 ### Building

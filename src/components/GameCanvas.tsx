@@ -53,13 +53,6 @@ export const GameCanvas = forwardRef<GameCanvasRef, Props>(({ onInteract, onEnti
   }, [onEncounter, onBiomeChange]);
 
   useEffect(() => {
-    if (engineRef.current && apiKey) {
-      engineRef.current.apiKey = apiKey;
-      engineRef.current.loadSprites();
-    }
-  }, [apiKey]);
-
-  useEffect(() => {
     if (!canvasRef.current) return;
     
     const resizeCanvas = () => {

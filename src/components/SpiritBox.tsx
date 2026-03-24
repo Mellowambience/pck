@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { getBattleCreatureVisual } from '../game/BattleSprites';
+import { BattlePixelSprite } from './BattlePixelSprite';
 
 export interface StoredSpirit {
   id: string;
   name: string;
   type: string;
+  variantSeed?: string;
   level: number;
   hp: number;
   maxHp: number;
@@ -33,19 +36,6 @@ const TYPE_BG: Record<string, string> = {
   Shadow: 'from-violet-900/60 to-slate-900/40', Sand: 'from-yellow-900/60 to-orange-900/40',
   Wind: 'from-lime-900/60 to-teal-900/40',
 };
-
-const CREATURE_EMOJI: Record<string, string> = {
-  Emberfox: '🦊', Aquapup: '🐾', Leafbug: '🐛', 'Aether-kin': '✨', 'Aether-Kin': '✨',
-  Mosshound: '🌿', Glimmerfly: '🦋', Dunecrawler: '🦂', Sandsprite: '🌪️', RoadWraith: '👻',
-};
-
-const TYPE_EMOJI: Record<string, string> = {
-  Fire: '🦊', Water: '🐾', Grass: '🐛', Fairy: '✨', Shadow: '👻', Sand: '🦂', Wind: '🦋',
-};
-
-function getEmoji(name: string, type: string) {
-  return CREATURE_EMOJI[name] || TYPE_EMOJI[type] || '🌟';
-}
 
 const BOX_SIZE = 20;
 
@@ -111,11 +101,16 @@ export const SpiritBox: React.FC<SpiritBoxProps> = ({ spirits, bonds = {}, onClo
               </div>
               <div className="flex gap-1.5 flex-wrap min-h-[36px]">
                 {partySpirits.map(s => (
+                  (() => {
+                    const visual = getBattleCreatureVisual(s.name, s.type, s.variantSeed || s.id);
+                    return (
                   <button key={s.id} onClick={() => setSelected(s)}
-                    className={`w-8 h-8 rounded flex items-center justify-center text-base transition-all border ${selected?.id === s.id ? 'border-amber-400 bg-amber-400/15' : 'border-white/10 bg-white/5 hover:border-amber-400/50'}`}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all border ${selected?.id === s.id ? 'border-amber-400 bg-amber-400/15' : 'border-white/10 bg-white/5 hover:border-amber-400/50'}`}
                     title={`${s.name} Lv${s.level}`}>
-                    {getEmoji(s.name, s.type)}
+                    <BattlePixelSprite sprite={visual.sprite} palette={visual.palette} size={2} />
                   </button>
+                    );
+                  })()
                 ))}
                 {partySpirits.length === 0 && <span className="text-[10px] text-slate-600 italic">No party members</span>}
               </div>
@@ -144,12 +139,13 @@ export const SpiritBox: React.FC<SpiritBoxProps> = ({ spirits, bonds = {}, onClo
                     const spirit = pageSpirits[i];
                     if (!spirit) return <div key={i} className="w-10 h-10 rounded border border-white/5 bg-slate-900/30" />;
                     const tc = TYPE_COLORS[spirit.type] || '#94a3b8';
+                    const visual = getBattleCreatureVisual(spirit.name, spirit.type, spirit.variantSeed || spirit.id);
                     return (
                       <button key={spirit.id} onClick={() => setSelected(spirit)}
                         className="w-10 h-10 rounded flex items-center justify-center text-xl transition-all border relative hover:border-white/30"
                         style={selected?.id === spirit.id ? { borderColor: tc + '80', backgroundColor: tc + '18', boxShadow: `0 0 8px ${tc}40` } : { borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(15,23,42,0.5)' }}
                         title={`${spirit.name} Lv${spirit.level}`}>
-                        {getEmoji(spirit.name, spirit.type)}
+                        <BattlePixelSprite sprite={visual.sprite} palette={visual.palette} size={2} />
                         <span className="absolute bottom-0.5 right-0.5 text-[7px] text-slate-400 font-mono">{spirit.level}</span>
                       </button>
                     );
@@ -164,10 +160,16 @@ export const SpiritBox: React.FC<SpiritBoxProps> = ({ spirits, bonds = {}, onClo
             <AnimatePresence mode="wait">
               {selected ? (
                 <motion.div key={selected.id} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="flex flex-col h-full">
+                  {(() => {
+                    const visual = getBattleCreatureVisual(selected.name, selected.type, selected.variantSeed || selected.id);
+                    return (
                   <div className={`p-5 bg-gradient-to-br ${TYPE_BG[selected.type] || 'from-slate-800/60 to-slate-900/40'} border-b border-white/5`}>
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="text-4xl mb-1">{getEmoji(selected.name, selected.type)}</div>
+                        <div className="mb-3 w-24 h-24 rounded-[1.5rem] border flex items-center justify-center"
+                          style={{ borderColor: typeColor + '70', backgroundColor: typeColor + '18', boxShadow: `0 0 24px ${typeColor}30` }}>
+                          <BattlePixelSprite sprite={visual.sprite} palette={visual.palette} size={4} />
+                        </div>
                         <h3 className="text-white font-bold text-lg tracking-wide">{selected.name}</h3>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs px-2 py-0.5 rounded-full font-mono border"
@@ -183,11 +185,13 @@ export const SpiritBox: React.FC<SpiritBoxProps> = ({ spirits, bonds = {}, onClo
                         <div className="text-xs text-slate-600 font-mono mt-1">{new Date(selected.catchDate).toLocaleDateString()}</div>
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <div className="flex justify-between text-xs text-slate-400 font-mono mb-1"><span>HP</span><span>{selected.hp}/{selected.maxHp}</span></div>
-                      <StatBar val={selected.hp} max={selected.maxHp} color={selected.hp / selected.maxHp > 0.5 ? '#34d399' : selected.hp / selected.maxHp > 0.25 ? '#fbbf24' : '#f87171'} />
-                    </div>
+                  <div className="mt-3">
+                    <div className="flex justify-between text-xs text-slate-400 font-mono mb-1"><span>HP</span><span>{selected.hp}/{selected.maxHp}</span></div>
+                    <StatBar val={selected.hp} max={selected.maxHp} color={selected.hp / selected.maxHp > 0.5 ? '#34d399' : selected.hp / selected.maxHp > 0.25 ? '#fbbf24' : '#f87171'} />
                   </div>
+                  </div>
+                    );
+                  })()}
 
                   <div className="p-4 border-b border-white/5 flex-1">
                     <div className="text-xs text-slate-500 uppercase tracking-widest mb-2">Moves</div>
@@ -230,7 +234,9 @@ export const SpiritBox: React.FC<SpiritBoxProps> = ({ spirits, bonds = {}, onClo
                 </motion.div>
               ) : (
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-full text-center p-8">
-                  <div className="text-5xl mb-4 opacity-20">📦</div>
+                  <div className="w-14 h-14 rounded-[1.25rem] border border-white/10 bg-slate-900/40 mb-4 relative">
+                    <div className="absolute inset-2 rounded-[0.9rem] border border-dashed border-slate-700/70" />
+                  </div>
                   <p className="text-slate-600 text-sm">Select a spirit to view details</p>
                   <p className="text-slate-700 text-xs mt-2">Click any icon in the box or party</p>
                 </motion.div>

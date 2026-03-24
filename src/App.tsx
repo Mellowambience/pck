@@ -15,6 +15,8 @@ import { SpiritDex } from './components/SpiritDex';
 import { SpiritBox, StoredSpirit } from './components/SpiritBox';
 import { PLAYER_MOVES } from './game/Moves';
 import { QuestLog } from './components/QuestLog';
+import { getBattleCreatureVisual } from './game/BattleSprites';
+import { BattlePixelSprite } from './components/BattlePixelSprite';
 import { AnimatePresence } from 'motion/react';
 
 export default function App() {
@@ -239,7 +241,7 @@ export default function App() {
 
   const handleItemDrop = (drop: ItemDrop) => {
     setInventory(prev => ({ ...prev, [drop.item]: (prev[drop.item] || 0) + 1 }));
-    setChatHistory(prev => [...prev, { role: 'dm', text: `✨ A ${drop.item} materialized from the disturbance!` }]);
+    setChatHistory(prev => [...prev, { role: 'dm', text: `A ${drop.item} materialized from the disturbance!` }]);
     // Immediately check if any spirit can evolve with this item
     setTimeout(() => {
       setTamedSpirits(ss => {
@@ -269,6 +271,7 @@ export default function App() {
     const newSpirit: StoredSpirit = {
       id: Math.random().toString(36).substring(2, 9),
       name, type, level,
+      variantSeed: battleState?.variantSeed || `${name}:${type}:${Date.now()}`,
       hp: 20 + level * 5,
       maxHp: 20 + level * 5,
       moves: PLAYER_MOVES.slice(0, 4),
@@ -551,11 +554,11 @@ export default function App() {
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="relative bg-neutral-900 border border-purple-500/30 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-white/10">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-purple-300">📖 SpiritDex</h2>
+              <h2 className="text-sm font-bold uppercase tracking-widest text-purple-300">SpiritDex</h2>
               <button onClick={() => setShowDex(false)} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
             </div>
             <div className="overflow-y-auto flex-1">
-              <SpiritDex spirits={tamedSpirits.map(s => ({ name: s.name, type: s.type, level: s.level, caught: true }))} />
+              <SpiritDex spirits={tamedSpirits.map(s => ({ name: s.name, type: s.type, level: s.level, variantSeed: s.variantSeed || s.id }))} />
             </div>
           </div>
         </div>
@@ -580,19 +583,25 @@ export default function App() {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-lg">📦</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-300 shadow-[0_0_8px_rgba(165,180,252,0.8)]" />
               <span className="text-xs font-bold uppercase tracking-widest text-indigo-300 group-hover:text-indigo-200">Spirit Box</span>
             </div>
             <span className="text-xs font-mono text-slate-400">{tamedSpirits.length} caught</span>
           </div>
           {tamedSpirits.length > 0 && (
             <div className="flex gap-1 mt-2 flex-wrap">
-              {tamedSpirits.filter(s => s.inParty).slice(0, 6).map(s => (
-                <span key={s.id} className="text-base">
-                  {s.type === 'Fire' ? '🦊' : s.type === 'Water' ? '🐾' : s.type === 'Grass' ? '🐛' :
-                   s.type === 'Shadow' ? '👻' : s.type === 'Sand' ? '🦂' : s.type === 'Wind' ? '🦋' : '✨'}
-                </span>
-              ))}
+              {tamedSpirits.filter(s => s.inParty).slice(0, 6).map(s => {
+                const visual = getBattleCreatureVisual(s.name, s.type, s.variantSeed || s.id);
+                return (
+                  <span
+                    key={s.id}
+                    className="w-8 h-8 rounded-lg border border-white/10 bg-white/5 flex items-center justify-center"
+                    title={`${s.name} Lv${s.level}`}
+                  >
+                    <BattlePixelSprite sprite={visual.sprite} palette={visual.palette} size={1} />
+                  </span>
+                );
+              })}
             </div>
           )}
         </button>
@@ -602,7 +611,7 @@ export default function App() {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-lg">📖</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-300 shadow-[0_0_8px_rgba(216,180,254,0.8)]" />
               <span className="text-xs font-bold uppercase tracking-widest text-purple-300 group-hover:text-purple-200">SpiritDex</span>
             </div>
             <span className="text-xs font-mono text-slate-400">{[...new Set(tamedSpirits.map(s => s.name))].length} seen</span>
@@ -619,7 +628,7 @@ export default function App() {
             <div className="flex justify-between"><span>Potions</span><span>{inventory.potion}</span></div>
             <div className="flex justify-between"><span>Roses</span><span>{inventory.roses}</span></div>
             {Object.entries(inventory).filter(([k]) => !['aetherOrb','potion','roses'].includes(k) && (inventory[k] as number) > 0).map(([k, v]) => (
-              <div key={k} className="flex justify-between text-purple-300"><span>✨ {k}</span><span>{v as number}</span></div>
+              <div key={k} className="flex justify-between text-purple-300"><span>{k}</span><span>{v as number}</span></div>
             ))}
           </div>
           <div className="space-y-3">

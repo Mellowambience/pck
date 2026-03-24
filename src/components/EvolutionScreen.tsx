@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { EvolutionChain, EVOLUTION_STAGES } from '../game/Evolutions';
+import { getBattleCreatureVisual } from '../game/BattleSprites';
+import { BattlePixelSprite } from './BattlePixelSprite';
 
 interface EvolutionScreenProps {
-  spirit: { name: string; level: number; type: string };
+  spirit: { name: string; level: number; type: string; variantSeed?: string };
   chain: EvolutionChain;
   onComplete: (newName: string) => void;
   onCancel: () => void;
@@ -26,6 +28,8 @@ export const EvolutionScreen: React.FC<EvolutionScreenProps> = ({
   const toStage = EVOLUTION_STAGES[chain.to];
   const typeColor = TYPE_COLORS[fromStage?.type || spirit.type] || '#94a3b8';
   const toColor = TYPE_COLORS[toStage?.type || spirit.type] || '#c084fc';
+  const fromVisual = getBattleCreatureVisual(chain.from, fromStage?.type || spirit.type, spirit.variantSeed || `${chain.from}:${spirit.type}`);
+  const toVisual = getBattleCreatureVisual(chain.to, toStage?.type || spirit.type, `${spirit.variantSeed || spirit.name}:${chain.to}`);
 
   useEffect(() => {
     if (phase !== 'flash') return;
@@ -68,18 +72,18 @@ export const EvolutionScreen: React.FC<EvolutionScreenProps> = ({
               </div>
               <div className="flex items-center gap-8">
                 <div className="flex flex-col items-center gap-2">
-                  <div className="w-24 h-24 rounded-full border-2 flex items-center justify-center text-5xl"
+                  <div className="w-24 h-24 rounded-[1.5rem] border-2 flex items-center justify-center"
                     style={{ borderColor: typeColor, backgroundColor: typeColor + '18', boxShadow: `0 0 30px ${typeColor}50` }}>
-                    {fromStage?.sprite || '✨'}
+                    <BattlePixelSprite sprite={fromVisual.sprite} palette={fromVisual.palette} size={4} />
                   </div>
                   <span className="text-xs font-mono text-slate-400">{chain.from}</span>
                 </div>
                 <motion.div animate={{ x: [-4, 4, -4] }} transition={{ repeat: Infinity, duration: 0.8 }}
                   className="text-2xl text-white/60">→</motion.div>
                 <div className="flex flex-col items-center gap-2">
-                  <div className="w-24 h-24 rounded-full border-2 flex items-center justify-center text-5xl opacity-40"
+                  <div className="w-24 h-24 rounded-[1.5rem] border-2 flex items-center justify-center opacity-40"
                     style={{ borderColor: toColor, backgroundColor: toColor + '18' }}>
-                    {toStage?.sprite || '🌟'}
+                    <BattlePixelSprite sprite={toVisual.sprite} palette={toVisual.palette} size={4} />
                   </div>
                   <span className="text-xs font-mono text-slate-500">???</span>
                 </div>
@@ -91,7 +95,7 @@ export const EvolutionScreen: React.FC<EvolutionScreenProps> = ({
                 <button onClick={startEvo}
                   className="flex-1 py-3 rounded text-sm font-bold border transition-all"
                   style={{ borderColor: typeColor + '80', color: typeColor, backgroundColor: typeColor + '15' }}>
-                  ✨ Evolve
+                  Begin Evolution
                 </button>
                 <button onClick={onCancel}
                   className="px-4 py-3 rounded text-sm font-bold border border-slate-700 text-slate-400 hover:text-white transition-all">
@@ -108,9 +112,9 @@ export const EvolutionScreen: React.FC<EvolutionScreenProps> = ({
                             filter: [`brightness(1)`, `brightness(4)`, `brightness(1)`, `brightness(5)`,
                                      `brightness(1)`, `brightness(6)`, `brightness(1)`, `brightness(8)`, `brightness(20)`, `brightness(20)`] }}
                 transition={{ duration: flashCount * 0.2 + 0.5, ease: 'easeInOut' }}
-                className="w-32 h-32 rounded-full border-4 flex items-center justify-center text-6xl"
+                className="w-32 h-32 rounded-[2rem] border-4 flex items-center justify-center"
                 style={{ borderColor: typeColor, backgroundColor: typeColor + '30', boxShadow: `0 0 60px ${typeColor}` }}>
-                {fromStage?.sprite || '✨'}
+                <BattlePixelSprite sprite={fromVisual.sprite} palette={fromVisual.palette} size={5} />
               </motion.div>
               <p className="text-white/60 text-sm font-mono animate-pulse">Evolving…</p>
             </motion.div>
@@ -123,9 +127,9 @@ export const EvolutionScreen: React.FC<EvolutionScreenProps> = ({
               <motion.div
                 animate={{ boxShadow: [`0 0 30px ${toColor}80`, `0 0 80px ${toColor}`, `0 0 30px ${toColor}80`] }}
                 transition={{ repeat: Infinity, duration: 1.5 }}
-                className="w-32 h-32 rounded-full border-4 flex items-center justify-center text-6xl"
+                className="w-32 h-32 rounded-[2rem] border-4 flex items-center justify-center"
                 style={{ borderColor: toColor, backgroundColor: toColor + '20' }}>
-                {toStage?.sprite || '🌟'}
+                <BattlePixelSprite sprite={toVisual.sprite} palette={toVisual.palette} size={5} />
               </motion.div>
               <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }}
                 className="space-y-2">
@@ -155,7 +159,7 @@ export const EvolutionScreen: React.FC<EvolutionScreenProps> = ({
                 <button onClick={finish}
                   className="w-full py-3 rounded text-sm font-bold border transition-all"
                   style={{ borderColor: toColor + '80', color: toColor, backgroundColor: toColor + '15' }}>
-                  Amazing! ✨
+                  Evolution Complete
                 </button>
               )}
             </motion.div>

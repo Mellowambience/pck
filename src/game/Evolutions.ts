@@ -25,7 +25,6 @@ export interface EvolutionStage {
   name: string;
   type: string;
   stage: number;           // 0 = base, 1 = first evo, 2 = final
-  sprite: string;          // emoji representative
   baseHp: number;
   baseAtk: number;
 }
@@ -33,43 +32,43 @@ export interface EvolutionStage {
 // ── Stage data ───────────────────────────────────────────────
 export const EVOLUTION_STAGES: Record<string, EvolutionStage> = {
   // Fire line
-  Emberfox:     { name: 'Emberfox',     type: 'Fire',   stage: 0, sprite: '🦊', baseHp: 30, baseAtk: 8  },
-  Flamehound:   { name: 'Flamehound',   type: 'Fire',   stage: 1, sprite: '🐺', baseHp: 50, baseAtk: 14 },
-  Infernowolf:  { name: 'Infernowolf',  type: 'Fire',   stage: 2, sprite: '🔥', baseHp: 80, baseAtk: 22 },
+  Emberfox:     { name: 'Emberfox',     type: 'Fire',   stage: 0, baseHp: 30, baseAtk: 8  },
+  Flamehound:   { name: 'Flamehound',   type: 'Fire',   stage: 1, baseHp: 50, baseAtk: 14 },
+  Infernowolf:  { name: 'Infernowolf',  type: 'Fire',   stage: 2, baseHp: 80, baseAtk: 22 },
 
   // Water line
-  Aquapup:      { name: 'Aquapup',      type: 'Water',  stage: 0, sprite: '🐾', baseHp: 32, baseAtk: 7  },
-  Tidehound:    { name: 'Tidehound',    type: 'Water',  stage: 1, sprite: '🌊', baseHp: 52, baseAtk: 13 },
-  Abyssalwolf:  { name: 'Abyssalwolf',  type: 'Water',  stage: 2, sprite: '🌀', baseHp: 82, baseAtk: 20 },
+  Aquapup:      { name: 'Aquapup',      type: 'Water',  stage: 0, baseHp: 32, baseAtk: 7  },
+  Tidehound:    { name: 'Tidehound',    type: 'Water',  stage: 1, baseHp: 52, baseAtk: 13 },
+  Abyssalwolf:  { name: 'Abyssalwolf',  type: 'Water',  stage: 2, baseHp: 82, baseAtk: 20 },
 
   // Grass line
-  Leafbug:      { name: 'Leafbug',      type: 'Grass',  stage: 0, sprite: '🐛', baseHp: 28, baseAtk: 6  },
-  Mosswing:     { name: 'Mosswing',     type: 'Grass',  stage: 1, sprite: '🦗', baseHp: 46, baseAtk: 11 },
-  Verdantdrake: { name: 'Verdantdrake', type: 'Grass',  stage: 2, sprite: '🐲', baseHp: 76, baseAtk: 19 },
+  Leafbug:      { name: 'Leafbug',      type: 'Grass',  stage: 0, baseHp: 28, baseAtk: 6  },
+  Mosswing:     { name: 'Mosswing',     type: 'Grass',  stage: 1, baseHp: 46, baseAtk: 11 },
+  Verdantdrake: { name: 'Verdantdrake', type: 'Grass',  stage: 2, baseHp: 76, baseAtk: 19 },
 
   // Fairy line
-  'Aether-Kin': { name: 'Aether-Kin',   type: 'Fairy',  stage: 0, sprite: '✨', baseHp: 26, baseAtk: 9  },
-  Glimmerkin:   { name: 'Glimmerkin',   type: 'Fairy',  stage: 1, sprite: '🌟', baseHp: 44, baseAtk: 15 },
-  Celestiant:   { name: 'Celestiant',   type: 'Fairy',  stage: 2, sprite: '👑', baseHp: 72, baseAtk: 24 },
+  'Aether-Kin': { name: 'Aether-Kin',   type: 'Fairy',  stage: 0, baseHp: 26, baseAtk: 9  },
+  Glimmerkin:   { name: 'Glimmerkin',   type: 'Fairy',  stage: 1, baseHp: 44, baseAtk: 15 },
+  Celestiant:   { name: 'Celestiant',   type: 'Fairy',  stage: 2, baseHp: 72, baseAtk: 24 },
 
   // Shadow line
-  RoadWraith:   { name: 'RoadWraith',   type: 'Shadow', stage: 0, sprite: '👻', baseHp: 24, baseAtk: 11 },
-  Voidshade:    { name: 'Voidshade',    type: 'Shadow', stage: 1, sprite: '🌑', baseHp: 42, baseAtk: 18 },
-  Nullreaper:   { name: 'Nullreaper',   type: 'Shadow', stage: 2, sprite: '💀', baseHp: 70, baseAtk: 28 },
+  RoadWraith:   { name: 'RoadWraith',   type: 'Shadow', stage: 0, baseHp: 24, baseAtk: 11 },
+  Voidshade:    { name: 'Voidshade',    type: 'Shadow', stage: 1, baseHp: 42, baseAtk: 18 },
+  Nullreaper:   { name: 'Nullreaper',   type: 'Shadow', stage: 2, baseHp: 70, baseAtk: 28 },
 
   // Sand line
-  Dunecrawler:  { name: 'Dunecrawler',  type: 'Sand',   stage: 0, sprite: '🦂', baseHp: 34, baseAtk: 8  },
-  Sandwarden:   { name: 'Sandwarden',   type: 'Sand',   stage: 1, sprite: '🏜️', baseHp: 56, baseAtk: 14 },
-  Dunecolossal: { name: 'Dunecolossal', type: 'Sand',   stage: 2, sprite: '⛰️', baseHp: 90, baseAtk: 22 },
+  Dunecrawler:  { name: 'Dunecrawler',  type: 'Sand',   stage: 0, baseHp: 34, baseAtk: 8  },
+  Sandwarden:   { name: 'Sandwarden',   type: 'Sand',   stage: 1, baseHp: 56, baseAtk: 14 },
+  Dunecolossal: { name: 'Dunecolossal', type: 'Sand',   stage: 2, baseHp: 90, baseAtk: 22 },
 
   // Wind line
-  Sandsprite:   { name: 'Sandsprite',   type: 'Wind',   stage: 0, sprite: '🌪️', baseHp: 22, baseAtk: 10 },
-  Stormwing:    { name: 'Stormwing',    type: 'Wind',   stage: 1, sprite: '⚡', baseHp: 40, baseAtk: 17 },
-  Tempestlord:  { name: 'Tempestlord',  type: 'Wind',   stage: 2, sprite: '🌩️', baseHp: 68, baseAtk: 26 },
+  Sandsprite:   { name: 'Sandsprite',   type: 'Wind',   stage: 0, baseHp: 22, baseAtk: 10 },
+  Stormwing:    { name: 'Stormwing',    type: 'Wind',   stage: 1, baseHp: 40, baseAtk: 17 },
+  Tempestlord:  { name: 'Tempestlord',  type: 'Wind',   stage: 2, baseHp: 68, baseAtk: 26 },
 
   // Wild specials (no evolutions)
-  Glimmerfly:   { name: 'Glimmerfly',   type: 'Fairy',  stage: 1, sprite: '🦋', baseHp: 38, baseAtk: 12 },
-  Mosshound:    { name: 'Mosshound',    type: 'Grass',  stage: 1, sprite: '🌿', baseHp: 40, baseAtk: 11 },
+  Glimmerfly:   { name: 'Glimmerfly',   type: 'Fairy',  stage: 1, baseHp: 38, baseAtk: 12 },
+  Mosshound:    { name: 'Mosshound',    type: 'Grass',  stage: 1, baseHp: 40, baseAtk: 11 },
 };
 
 // ── Evolution chains ─────────────────────────────────────────

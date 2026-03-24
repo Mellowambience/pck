@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Move, buildMove, getCreatureMoves, pickAIMove, PLAYER_MOVES } from '../game/Moves';
+import { getBattleCreatureVisual, getBattlePlayerVisual } from '../game/BattleSprites';
+import { BattlePixelSprite } from './BattlePixelSprite';
 
 interface Creature {
   name: string; type: string; hp: number; maxHp: number;
-  color: string; level: number; shield?: number;
+  color: string; level: number; shield?: number; variantSeed?: string;
 }
 
 interface PartySpirit {
   id: string;
   name: string;
   type: string;
+  variantSeed?: string;
   level: number;
   hp: number;
   maxHp: number;
@@ -56,7 +59,7 @@ const STATUS_COLORS: Record<string, string> = {
   burn: '#f97316', freeze: '#7dd3fc', paralyze: '#facc15', confuse: '#e879f9',
 };
 const STATUS_ICONS: Record<string, string> = {
-  burn: '🔥', freeze: '❄️', paralyze: '⚡', confuse: '💫',
+  burn: 'BRN', freeze: 'FRZ', paralyze: 'PRZ', confuse: 'CNF',
 };
 
 interface StatusEffect { type: 'burn' | 'freeze' | 'paralyze' | 'confuse'; turnsLeft: number; }
@@ -70,10 +73,6 @@ function calcDamage(move: Move, atkLevel: number, defType: string, isBroken: boo
 }
 
 const hpColor = (p: number) => p > 50 ? '#34d399' : p > 25 ? '#fbbf24' : '#f87171';
-
-const CREATURE_EMOJI: Record<string, string> = {
-  Fire: '🦊', Water: '🐾', Grass: '🐛', Fairy: '✨', Shadow: '👻', Sand: '🦂', Wind: '🦋',
-};
 
 export const BattleScreen: React.FC<BattleScreenProps> = ({
   wildCreature, onFlee, onCatch, aetherOrbs, onUseAetherOrb,
@@ -111,6 +110,10 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({
   const typeColor = TYPE_COLORS[wildCreature.type] || '#94a3b8';
   const hpPct = (wildHp / wildCreature.maxHp) * 100;
   const playerHpPct = (playerHp / playerHpMax) * 100;
+  const wildVisual = getBattleCreatureVisual(wildCreature.name, wildCreature.type, wildCreature.variantSeed);
+  const playerVisual = activeSpirit
+    ? getBattleCreatureVisual(activeSpirit.name, activeSpirit.type, activeSpirit.variantSeed || activeSpirit.id)
+    : getBattlePlayerVisual();
 
   useEffect(() => {
     const t = setTimeout(() => { setPhase('choose'); setShowMoves(true); }, 1600);
@@ -357,22 +360,22 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({
         <div className="absolute right-1/4 top-0 flex flex-col items-center">
           <motion.div animate={{ y: [0, -14, 0], scale: shakeWild ? [1, 1.1, 0.9, 1] : 1 }}
             transition={{ y: { repeat: Infinity, duration: 3, ease: 'easeInOut' }, scale: { duration: 0.3 } }}>
-            <div className={`w-32 h-32 rounded-full border-4 flex items-center justify-center text-5xl ${flashWild ? 'opacity-30' : 'opacity-100'} transition-opacity`}
+            <div className={`w-40 h-40 rounded-[2rem] border-4 flex items-center justify-center ${flashWild ? 'opacity-30' : 'opacity-100'} transition-opacity`}
               style={{ borderColor: typeColor, boxShadow: `0 0 40px ${typeColor}50`, backgroundColor: typeColor + '18' }}>
-              {CREATURE_EMOJI[wildCreature.type] || '🌟'}
+              <BattlePixelSprite sprite={wildVisual.sprite} palette={wildVisual.palette} size={6} />
             </div>
           </motion.div>
         </div>
         <div className="absolute left-1/4 bottom-4">
           <motion.div animate={{ scale: shakePlayer ? [1, 1.1, 0.9, 1] : 1 }} transition={{ duration: 0.3 }}>
-            <div className={`w-24 h-24 rounded-full border-4 flex items-center justify-center text-4xl ${flashPlayer ? 'opacity-30' : 'opacity-100'} transition-opacity`}
+            <div className={`w-32 h-32 rounded-[1.75rem] border-4 flex items-center justify-center ${flashPlayer ? 'opacity-30' : 'opacity-100'} transition-opacity`}
               style={{ borderColor: '#c084fc', boxShadow: '0 0 30px rgba(192,132,252,0.4)', backgroundColor: 'rgba(192,132,252,0.1)' }}>
-              🧙‍♀️
+              <BattlePixelSprite sprite={playerVisual.sprite} palette={playerVisual.palette} size={5} flipped />
             </div>
           </motion.div>
         </div>
         <div className="absolute top-2 left-1/2 -translate-x-1/2">
-          {(() => { const m = getTypeMult('Fairy', wildCreature.type); if (m >= 2) return <span className="text-xs text-emerald-400 bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-700">⚡ Type advantage!</span>; if (m < 1) return <span className="text-xs text-rose-400 bg-rose-950/80 px-3 py-1 rounded-full border border-rose-800">⚠ Type disadvantage</span>; return null; })()}
+          {(() => { const m = getTypeMult('Fairy', wildCreature.type); if (m >= 2) return <span className="text-xs text-emerald-400 bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-700">Type advantage</span>; if (m < 1) return <span className="text-xs text-rose-400 bg-rose-950/80 px-3 py-1 rounded-full border border-rose-800">Type disadvantage</span>; return null; })()}
         </div>
       </div>
 
@@ -382,7 +385,7 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({
           className="bg-slate-900/85 p-4 rounded border-t-2 border-b-2 w-72 shadow-2xl backdrop-blur-md mb-3" style={{ borderColor: 'rgba(192,132,252,0.7)' }}>
           <div className="flex justify-between items-center mb-2">
             <div>
-              <h2 className="text-lg font-bold tracking-wider">Amara</h2>
+              <h2 className="text-lg font-bold tracking-wider">{playerLabel}</h2>
               {playerStatus && (
                 <span className="text-xs px-2 py-0.5 rounded-full font-mono mt-1 inline-block"
                   style={{ backgroundColor: STATUS_COLORS[playerStatus.type] + '30', color: STATUS_COLORS[playerStatus.type], border: `1px solid ${STATUS_COLORS[playerStatus.type]}60` }}>
@@ -391,7 +394,7 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({
               )}
             </div>
             <div className="flex gap-2 items-center">
-              <span className="text-xs font-mono px-2 py-0.5 rounded border" style={{ color: '#c084fc', borderColor: 'rgba(192,132,252,0.5)', backgroundColor: 'rgba(192,132,252,0.15)' }}>Fairy</span>
+              <span className="text-xs font-mono px-2 py-0.5 rounded border" style={{ color: activeSpirit ? (TYPE_COLORS[activeSpirit.type] || '#c084fc') : '#c084fc', borderColor: activeSpirit ? ((TYPE_COLORS[activeSpirit.type] || '#c084fc') + '80') : 'rgba(192,132,252,0.5)', backgroundColor: activeSpirit ? ((TYPE_COLORS[activeSpirit.type] || '#c084fc') + '15') : 'rgba(192,132,252,0.15)' }}>{activeSpirit?.type || 'Fairy'}</span>
               <span className="text-xs text-slate-400 font-mono">Lv {playerLevel}</span>
             </div>
           </div>
@@ -464,14 +467,14 @@ export const BattleScreen: React.FC<BattleScreenProps> = ({
               <div className="grid grid-cols-3 gap-2">
                 <button onClick={() => { if (playerBp > 0 && atkBoost < 3) { setPlayerBp(p => p - 1); setAtkBoost(p => p + 1); addMsg('Aether charged!', `Attack ×${atkBoost + 1}`); } }} disabled={playerBp <= 0 || atkBoost >= 3}
                   className="bg-amber-800/60 hover:bg-amber-700/80 border border-amber-600/50 text-amber-200 text-xs font-bold py-2 rounded disabled:opacity-25">
-                  ⚡ Boost ({playerBp})
+                  Focus Boost ({playerBp})
                 </button>
                 <button onClick={handleCatch} disabled={aetherOrbs <= 0}
                   className="bg-violet-800/60 hover:bg-violet-700/80 border border-violet-600/50 text-violet-200 text-xs font-bold py-2 rounded disabled:opacity-25">
-                  🔮 Catch ({aetherOrbs})
+                  Cast Orb ({aetherOrbs})
                 </button>
                 <button onClick={onFlee} className="bg-slate-800/60 hover:bg-slate-700/80 border border-slate-600/50 text-slate-300 text-xs font-bold py-2 rounded">
-                  🏃 Flee
+                  Retreat
                 </button>
               </div>
             </motion.div>
